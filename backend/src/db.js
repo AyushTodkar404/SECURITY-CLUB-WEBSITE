@@ -22,13 +22,11 @@ export const db = useTurso
   })
   : new Database(databasePath)
 
-db.exec('PRAGMA foreign_keys = ON;')
-
 if (!useTurso) {
+  db.exec('PRAGMA foreign_keys = ON;')
   db.exec('PRAGMA journal_mode = WAL;')
+  db.exec('PRAGMA busy_timeout = 5000;')
 }
-
-db.exec('PRAGMA busy_timeout = 5000;')
 
 const hasTable = (name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name))
 const columns = (name) => hasTable(name)
