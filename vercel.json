@@ -6,7 +6,7 @@
             "framework": "express"
         },
         "security_website": {
-            "root": "document/security_website",
+            "root": "security_website",
             "framework": "vite"
         }
     },
