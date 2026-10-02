@@ -8,8 +8,15 @@ import { roles } from './access.js'
 const app = express()
 const port = Number(process.env.PORT ?? 3001)
 const production = process.env.NODE_ENV === 'production'
-const allowedOrigins = new Set((process.env.CORS_ORIGINS ?? (production ? '' : 'http://localhost:5173,http://127.0.0.1:5173'))
-  .split(',').map((origin) => origin.trim()).filter(Boolean))
+const allowedOrigins = new Set(
+  (process.env.CORS_ORIGINS ??
+    (production
+      ? 'https://security-club-website.vercel.app'
+      : 'http://localhost:5173,http://127.0.0.1:5173'))
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+)
 const sessionDays = Number(process.env.SESSION_DAYS ?? 7)
 
 app.disable('x-powered-by')
