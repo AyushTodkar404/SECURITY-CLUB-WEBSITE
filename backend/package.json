@@ -11,6 +11,8 @@
     "bootstrap-admin": "node --env-file=.env src/bootstrap-admin.js"
   },
   "dependencies": {
-    "express": "^5.1.0"
+    "@libsql/client": "^0.18.0",
+    "express": "^5.1.0",
+    "libsql": "^0.5.29"
   }
 }

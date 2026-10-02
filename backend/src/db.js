@@ -1,13 +1,34 @@
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
+import Database from 'libsql'
 
-const databasePath = resolve(process.env.DATABASE_PATH ?? './data/security-club.sqlite')
-mkdirSync(dirname(databasePath), { recursive: true })
+const useTurso = Boolean(
+  process.env.TURSO_DATABASE_URL &&
+  process.env.TURSO_AUTH_TOKEN
+)
 
-export const db = new DatabaseSync(databasePath)
-db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;')
+const databasePath = resolve(
+  process.env.DATABASE_PATH ?? './data/security-club.sqlite'
+)
+
+if (!useTurso) {
+  mkdirSync(dirname(databasePath), { recursive: true })
+}
+
+export const db = useTurso
+  ? new Database(process.env.TURSO_DATABASE_URL, {
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  })
+  : new Database(databasePath)
+
+db.exec('PRAGMA foreign_keys = ON;')
+
+if (!useTurso) {
+  db.exec('PRAGMA journal_mode = WAL;')
+}
+
+db.exec('PRAGMA busy_timeout = 5000;')
 
 const hasTable = (name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name))
 const columns = (name) => hasTable(name)
