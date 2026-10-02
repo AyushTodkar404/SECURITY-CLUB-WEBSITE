@@ -1075,4 +1075,4 @@ if (process.env.NODE_ENV !== 'test') {
     process.exitCode = 1
   })
 }
-export { app }
+export default app
