@@ -13,7 +13,7 @@ import type {
   CorePosition,
 } from '../types'
 
-const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api'
+const apiBaseUrl = import.meta.env.VITE_API_URL ?? '/api'
 
 export type { UserRole } from '../types'
 
