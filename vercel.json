@@ -1,0 +1,33 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "services": {
+        "backend": {
+            "root": "backend",
+            "framework": "express"
+        },
+        "security_website": {
+            "root": "document/security_website",
+            "framework": "vite"
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/api",
+            "destination": {
+                "service": "backend"
+            }
+        },
+        {
+            "source": "/api/(.*)",
+            "destination": {
+                "service": "backend"
+            }
+        },
+        {
+            "source": "/(.*)",
+            "destination": {
+                "service": "security_website"
+            }
+        }
+    ]
+}
