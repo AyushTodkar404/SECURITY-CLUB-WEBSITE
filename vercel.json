@@ -7,7 +7,13 @@
         },
         "security_website": {
             "root": "security_website",
-            "framework": "vite"
+            "framework": "vite",
+            "rewrites": [
+                {
+                    "source": "/(.*)",
+                    "destination": "/index.html"
+                }
+            ]
         }
     },
     "rewrites": [
