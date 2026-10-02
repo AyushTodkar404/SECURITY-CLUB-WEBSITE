@@ -109,6 +109,13 @@ export async function submitMembershipApplication(
   })
 }
 
+export async function sendContactMessage(input: { name: string; email: string; message: string }): Promise<{ id: number; status: string }> {
+  return request<{ id: number; status: string }>('/contact-messages', {
+    method: 'POST',
+    ...jsonBody(input),
+  })
+}
+
 export async function getEvents(): Promise<EventItem[]> {
   return request<EventItem[]>('/events')
 }

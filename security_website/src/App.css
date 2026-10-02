@@ -1628,6 +1628,41 @@ textarea:focus {
   transform: translateX(2px);
 }
 
+.footer-follow-heading {
+  margin: 1.15rem 0 .65rem;
+}
+
+.footer-social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+
+.footer-social-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  color: #bfdbfe;
+}
+
+.footer-social-links svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
+.footer-social-links a:last-child svg {
+  fill: none;
+}
+
+.form-success {
+  color: #9beca9;
+}
+
+.form-error {
+  color: #ff9b9b;
+}
+
 /* =========================================================
    MISC
    ========================================================= */

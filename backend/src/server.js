@@ -1,4 +1,5 @@
 import express from 'express'
+import nodemailer from 'nodemailer'
 import { randomBytes } from 'node:crypto'
 import {
   db, hashPassword, verifyPassword, hashToken, sha256, slugify, now, transaction,
@@ -23,7 +24,16 @@ app.disable('x-powered-by')
 app.use(express.json({ limit: '2mb' }))
 app.use((request, response, next) => {
   const origin = request.header('origin')
-  if (origin && allowedOrigins.has(origin)) {
+  let sameOrigin = false
+  if (origin) {
+    try {
+      const parsedOrigin = new URL(origin)
+      sameOrigin = ['http:', 'https:'].includes(parsedOrigin.protocol) && parsedOrigin.host === request.get('host')
+    } catch {
+      sameOrigin = false
+    }
+  }
+  if (origin && (allowedOrigins.has(origin) || sameOrigin)) {
     response.setHeader('Access-Control-Allow-Origin', origin)
     response.setHeader('Access-Control-Allow-Credentials', 'true')
     response.setHeader('Vary', 'Origin')
@@ -31,8 +41,7 @@ app.use((request, response, next) => {
   response.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token')
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   if (request.method === 'OPTIONS') return response.sendStatus(204)
-  if (!production && origin && !allowedOrigins.has(origin)) return response.status(403).json({ error: 'Origin is not allowed' })
-  if (production && origin && !allowedOrigins.has(origin)) return response.status(403).json({ error: 'Origin is not allowed' })
+  if (origin && !allowedOrigins.has(origin) && !sameOrigin) return response.status(403).json({ error: 'Origin is not allowed' })
   next()
 })
 
@@ -752,11 +761,37 @@ app.get('/api/admin/memberships/pending-payment', requireAuth, requirePermission
 })
 
 app.post('/api/contact-messages', (request, response, next) => {
-  try {
+  const deliverMessage = async () => {
     const name = value(request.body, 'name', { max: 160 }); const address = email(request.body); const message = value(request.body, 'message', { max: 5000 })
+    const smtpUser = process.env.SMTP_USER
+    const smtpPassword = process.env.SMTP_PASSWORD
+    const recipient = process.env.CONTACT_EMAIL ?? 'securityclub@college.edu'
+    if (!smtpUser || !smtpPassword) throw fail(503, 'Email delivery is not configured yet. Please try again later or email the club directly.')
+
+    const secure = process.env.SMTP_SECURE !== 'false'
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT ?? (secure ? 465 : 587)),
+      secure,
+      auth: { user: smtpUser, pass: smtpPassword },
+    })
+    try {
+      await transporter.sendMail({
+        from: { name: process.env.SMTP_FROM_NAME ?? 'Security Club DBIT', address: smtpUser },
+        to: recipient,
+        replyTo: { name, address },
+        subject: `Website contact message from ${name}`,
+        text: `Name: ${name}\nEmail: ${address}\n\nMessage:\n${message}`,
+      })
+    } catch (mailError) {
+      console.error('Contact email delivery failed:', mailError)
+      throw fail(503, 'Unable to send your message right now. Please try again or email the club directly.')
+    }
+
     const result = db.prepare('INSERT INTO contact_messages(name,email,user_id,message,created_at) VALUES(?,?,?,?,?)').run(name, address, request.user?.id ?? null, message, now())
     send(response, { id: Number(result.lastInsertRowid), status: 'new' }, 201)
-  } catch (error) { next(error) }
+  }
+  deliverMessage().catch(next)
 })
 app.post('/api/membership-applications', (request, response, next) => {
   try {
