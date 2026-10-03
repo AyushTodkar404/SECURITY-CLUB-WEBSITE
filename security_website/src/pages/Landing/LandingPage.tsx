@@ -4,6 +4,14 @@ import Button from '../../components/ui/Button'
 // @ts-expect-error - JSX file without type definitions
 import SecurityLogoTrace from '../../assets/icon/SecurityLogoTrace'
 
+function LinkedInIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14ZM8.34 10H5.67v8h2.67v-8Zm7.01-.19c-1.28 0-2.14.7-2.49 1.37h-.04V10h-2.56v8h2.67v-3.96c0-1.04.2-2.05 1.49-2.05 1.27 0 1.29 1.19 1.29 2.12V18h2.67v-4.39c0-2.16-.46-3.8-3.03-3.8ZM7 6a1.55 1.55 0 1 0 0 3.1A1.55 1.55 0 0 0 7 6Z" /></svg>
+}
+
+function InstagramIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2"/><circle cx="17.5" cy="6.7" r="1.2" fill="currentColor"/></svg>
+}
+
 const startingPoints = [
   { icon: '</>', title: 'Learn by doing', text: 'Begin with guided workshops, friendly labs, and clear explanations—no experience required.' },
   { icon: '⚑', title: 'Find your people', text: 'Meet curious students who want to explore technology, ask questions, and grow together.' },
@@ -34,6 +42,15 @@ function LandingPage() {
             <Link to="/about"><Button variant="outline">Meet the club</Button></Link>
           </div>
           <p className="landing-reassurance">No prior knowledge. No gatekeeping. Just curiosity.</p>
+          <div className="landing-social" aria-label="Follow Security Club DBIT">
+            <span>Follow us on</span>
+            <a href="https://www.linkedin.com/in/security-club-dbit-801708404/" target="_blank" rel="noreferrer" aria-label="Security Club DBIT on LinkedIn">
+              <LinkedInIcon /><span>LinkedIn</span>
+            </a>
+            <a href="https://www.instagram.com/securityclubdbit" target="_blank" rel="noreferrer" aria-label="Security Club DBIT on Instagram">
+              <InstagramIcon /><span>Instagram</span>
+            </a>
+          </div>
         </div>
         <div className="landing-signal" aria-label="Security Club signal illustration">
           <SecurityLogoTrace size={400} />
