@@ -1,35 +1,18 @@
-import { useState, type FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import SectionHeader from '../../components/common/SectionHeader'
 import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import Button from '../../components/ui/Button'
-import { sendContactMessage } from '../../api/client'
 
 function ContactPage() {
-  const [submitting, setSubmitting] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const form = event.currentTarget
-    const formData = new FormData(form)
-    setSubmitting(true)
-    setMessage(null)
-    setError(null)
-
-    try {
-      await sendContactMessage({
-        name: String(formData.get('name') ?? '').trim(),
-        email: String(formData.get('email') ?? '').trim(),
-        message: String(formData.get('message') ?? '').trim(),
-      })
-      setMessage('Your message has been sent to the Security Club. Thank you for reaching out.')
-      form.reset()
-    } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : 'Unable to send your message. Please try again.')
-    } finally {
-      setSubmitting(false)
-    }
+    const formData = new FormData(event.currentTarget)
+    const name = String(formData.get('name') ?? '').trim()
+    const email = String(formData.get('email') ?? '').trim()
+    const message = String(formData.get('message') ?? '').trim()
+    const text = `Hello Security Club DBIT,\n\n${message}\n\nFrom: ${name}\nEmail: ${email}`
+    const whatsappUrl = `https://wa.me/919819582340?text=${encodeURIComponent(text)}`
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -43,13 +26,14 @@ function ContactPage() {
       <div className="grid two">
         <article className="card">
           <h3>Contact Info</h3>
-          <p>Email: <a href="mailto:securityclub@college.edu">securityclub@college.edu</a></p>
+          <p>Email: <a href="mailto:securityclubdbit@gmail.com">securityclubdbit@gmail.com</a></p>
+          <p>WhatsApp: <a href="https://wa.me/919819582340" target="_blank" rel="noreferrer">+91 98195 82340</a></p>
           <p>Location: DBIT Innovation Lab</p>
           <p>Office Hours: Tue and Thu, 4 PM to 6 PM</p>
         </article>
 
         <form className="card form" onSubmit={submit}>
-          <h3>Contact Form</h3>
+          <h3>Message us on WhatsApp</h3>
           <label htmlFor="contact-name">Name</label>
           <input id="contact-name" name="name" autoComplete="name" required maxLength={160} />
 
@@ -59,9 +43,8 @@ function ContactPage() {
           <label htmlFor="message">Message</label>
           <textarea id="message" name="message" rows={5} required maxLength={5000} />
 
-          {message ? <p className="form-success" role="status">{message}</p> : null}
-          {error ? <p className="form-error" role="alert">{error}</p> : null}
-          <Button type="submit" variant="secondary" disabled={submitting}>{submitting ? 'Sending...' : 'Send Message'}</Button>
+          <p className="form-help">WhatsApp will open with your message filled in. Review it and tap Send there.</p>
+          <Button type="submit" variant="secondary">Continue in WhatsApp</Button>
         </form>
       </div>
     </DraggableWorkspace>
