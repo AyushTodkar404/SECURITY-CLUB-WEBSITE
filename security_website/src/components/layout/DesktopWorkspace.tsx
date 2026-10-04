@@ -333,6 +333,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
 
   const [session, setSession] = useState<AuthSession | null>(null)
   const [sessionLoading, setSessionLoading] = useState(true)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const [activePaneWidth, setActivePaneWidth] = useState<number | null>(null)
   const [openPanels, setOpenPanels] = useState<OpenPanel[]>([])
@@ -714,8 +715,22 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
             <span>Security Club</span>
           </div>
 
+          <button
+            type="button"
+            className="menu-button"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="desktop-page-navigation"
+            aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            onClick={() => setMobileMenuOpen((value) => !value)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+
           <nav
-            className="nav-links desktop-page-links"
+            id="desktop-page-navigation"
+            className={`nav-links desktop-page-links ${mobileMenuOpen ? 'open' : ''}`.trim()}
             aria-label="Page headers"
           >
             {visibleRoutes.map((route) => (
@@ -735,6 +750,7 @@ function DesktopWorkspace({ routes }: DesktopWorkspaceProps) {
                 onPointerUp={
                   handleHeaderPointerUp
                 }
+                onClick={() => setMobileMenuOpen(false)}
               >
                 {route.label}
               </button>
