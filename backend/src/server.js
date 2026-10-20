@@ -21,6 +21,48 @@ const allowedOrigins = new Set(
 const sessionDays = Number(process.env.SESSION_DAYS ?? 7)
 
 app.disable('x-powered-by')
+app.use((_request, response, next) => {
+  response.setHeader('X-Content-Type-Options', 'nosniff')
+  response.setHeader('X-Frame-Options', 'DENY')
+  response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  next()
+})
+
+const rateLimitStores = new Map()
+function createRateLimiter({ windowMs = 15 * 60 * 1000, max = 20, message = 'Too many requests. Please try again later.' } = {}) {
+  const store = new Map()
+  rateLimitStores.set(store, windowMs)
+  return (request, response, next) => {
+    const ip = request.ip || request.socket.remoteAddress || 'unknown'
+    const now = Date.now()
+    const entry = store.get(ip)
+    if (!entry || now > entry.resetAt) {
+      store.set(ip, { count: 1, resetAt: now + windowMs })
+      return next()
+    }
+    if (entry.count >= max) {
+      response.setHeader('Retry-After', Math.ceil((entry.resetAt - now) / 1000))
+      return response.status(429).json({ error: message })
+    }
+    entry.count += 1
+    next()
+  }
+}
+
+setInterval(() => {
+  const now = Date.now()
+  for (const [store] of rateLimitStores) {
+    for (const [ip, entry] of store) {
+      if (now > entry.resetAt) store.delete(ip)
+    }
+  }
+}, 10 * 60 * 1000).unref()
+
+const authLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, message: 'Too many authentication attempts. Please try again in 15 minutes.' })
+const contactLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 10, message: 'Too many messages sent. Please try again later.' })
+const flagLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20, message: 'Too many flag submissions. Please slow down.' })
+
 app.use(express.json({ limit: '2mb' }))
 app.use((request, response, next) => {
   const origin = request.header('origin')
@@ -215,7 +257,7 @@ app.get('/api/auth/me', (request, response) => send(response, {
   } : null, permissions: request.user?.permissions ?? permissionKeys('visitor'),
   positions: request.user?.positions ?? [], mustChangePassword: request.user?.must_change_password ?? false,
 }))
-app.post('/api/auth/register', (request, response, next) => {
+app.post('/api/auth/register', authLimiter, (request, response, next) => {
   try {
     const displayName = value(request.body, 'displayName', { max: 160 })
     const address = email(request.body)
@@ -247,7 +289,7 @@ app.post('/api/auth/register', (request, response, next) => {
     send(response, { user: account.user }, 201)
   } catch (error) { next(error) }
 })
-app.post('/api/auth/login', (request, response, next) => {
+app.post('/api/auth/login', authLimiter, (request, response, next) => {
   try {
     const address = email(request.body)
     const password = value(request.body, 'password', { max: 200 })
@@ -760,7 +802,7 @@ app.get('/api/admin/memberships/pending-payment', requireAuth, requirePermission
   } catch (error) { next(error) }
 })
 
-app.post('/api/contact-messages', (request, response, next) => {
+app.post('/api/contact-messages', contactLimiter, (request, response, next) => {
   const deliverMessage = async () => {
     const name = value(request.body, 'name', { max: 160 }); const address = email(request.body); const message = value(request.body, 'message', { max: 5000 })
     const smtpUser = process.env.SMTP_USER
@@ -839,7 +881,7 @@ app.get('/api/me/dashboard', requireAuth, requireMember, (request, response, nex
   } catch (error) { next(error) }
 })
 app.get('/api/challenges', requireMember, (request, response, next) => { try { send(response, db.prepare(`SELECT c.id,c.title,c.slug,c.category,c.difficulty,c.points,c.description,c.status,EXISTS(SELECT 1 FROM challenge_solves s WHERE s.challenge_id=c.id AND s.user_id=?) AS solved FROM challenges c WHERE c.status='published' ORDER BY c.id`).all(request.user.id)) } catch (error) { next(error) } })
-app.post('/api/challenges/:id/submissions', requireMember, (request, response, next) => {
+app.post('/api/challenges/:id/submissions', requireMember, flagLimiter, (request, response, next) => {
   try {
     const id = integer({ id: request.params.id }, 'id', { min: 1 }); const flag = value(request.body, 'flag', { max: 1000 }); const challenge = db.prepare("SELECT * FROM challenges WHERE id=? AND status='published'").get(id)
     if (!challenge) throw fail(404, 'Challenge not found')

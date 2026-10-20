@@ -13,15 +13,16 @@ function Footer() {
           <h4>Quick Links</h4>
           <ul>
             <li><Link to="/events">Events</Link></li>
-            <li><Link to="/ctf">CTF</Link></li>
             <li><Link to="/membership">Membership</Link></li>
+            <li><Link to="/privacy">Privacy Policy</Link></li>
+            <li><Link to="/terms">Terms of Service</Link></li>
           </ul>
         </div>
 
         <div>
           <h4>Contact</h4>
           <ul>
-            <li><a href="mailto:securityclub@college.edu">securityclub@college.edu</a></li>
+            <li><a href="mailto:securityclubdbit@gmail.com">securityclubdbit@gmail.com</a></li>
           </ul>
         </div>
       </div>

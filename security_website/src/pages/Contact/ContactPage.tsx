@@ -27,7 +27,8 @@ function ContactPage() {
         <article className="card">
           <h3>Contact Info</h3>
           <p>Email: <a href="mailto:securityclubdbit@gmail.com">securityclubdbit@gmail.com</a></p>
-          <p>WhatsApp: <a href="https://wa.me/919819582340" target="_blank" rel="noreferrer">+91 98195 82340</a></p>
+          <p>Phone: <a href="tel:+919819582340">+91 98195 82340</a></p>
+          <p>WhatsApp: <a href="https://wa.me/919819582340" target="_blank" rel="noreferrer">Chat on WhatsApp</a></p>
           <p>Location: DBIT Innovation Lab</p>
           <p>Office Hours: Tue and Thu, 4 PM to 6 PM</p>
         </article>

@@ -11,6 +11,7 @@ import type {
   TeamMember,
   UserRole,
   CorePosition,
+  Challenge,
 } from '../types'
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? '/api'
@@ -406,6 +407,21 @@ export async function addComment(entityType: string, entityId: number, body: str
     method: 'POST',
     ...jsonBody({ body }),
   })
+}
+
+export async function getChallenges(): Promise<Challenge[]> {
+  return request<Challenge[]>('/challenges')
+}
+
+export async function submitChallenge(id: number, flag: string): Promise<{ correct: boolean; solved: boolean; points: number }> {
+  return request<{ correct: boolean; solved: boolean; points: number }>(`/challenges/${id}/submissions`, {
+    method: 'POST',
+    ...jsonBody({ flag }),
+  })
+}
+
+export async function getLeaderboard(): Promise<{ id: number; name: string; score: number; solves: number }[]> {
+  return request<{ id: number; name: string; score: number; solves: number }[]>('/leaderboard')
 }
 
 export type { CorePosition }

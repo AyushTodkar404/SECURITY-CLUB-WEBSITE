@@ -23,6 +23,8 @@ import EditorialHeadPage from '../pages/Core/EditorialHeadPage'
 import TechnicalHeadPage from '../pages/Core/TechnicalHeadPage'
 import ResearchHeadPage from '../pages/Core/ResearchHeadPage'
 import EventHeadPage from '../pages/Core/EventHeadPage'
+import PrivacyPage from '../pages/Legal/PrivacyPage'
+import TermsPage from '../pages/Legal/TermsPage'
 import type { UserRole } from '../api/client'
 import type { AuthSession } from '../types'
 
@@ -68,6 +70,8 @@ export const appRoutes: AppRoute[] = [
   { path: '/core/technical-head', label: 'Technical Head', element: <TechnicalHeadPage />, requiredRole: 'member', requiredPermission: 'content.read', requiredPosition: 'technical-head', showInNavigation: true },
   { path: '/core/research-head', label: 'Research Head', element: <ResearchHeadPage />, requiredRole: 'member', requiredPermission: 'content.read', requiredPosition: 'research-head', showInNavigation: true },
   { path: '/core/event-head', label: 'Event Head', element: <EventHeadPage />, requiredRole: 'member', requiredPermission: 'content.read', requiredPosition: 'event-head', showInNavigation: true },
+  { path: '/privacy', label: 'Privacy Policy', element: <PrivacyPage />, requiredRole: 'visitor', showInNavigation: false },
+  { path: '/terms', label: 'Terms of Service', element: <TermsPage />, requiredRole: 'visitor', showInNavigation: false },
 ]
 
 const roleRank: Record<UserRole, number> = { visitor: 0, member: 1, core: 2, admin: 3 }

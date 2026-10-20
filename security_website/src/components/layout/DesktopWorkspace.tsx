@@ -4,6 +4,7 @@ import { canAccessRoute, type AppRoute } from '../../app/routes'
 import { getAuthSession, logout } from '../../api/client'
 import type { AuthSession } from '../../types'
 import AccessDeniedPage from '../../pages/AccessDeniedPage'
+import NotFoundPage from '../../pages/NotFoundPage'
 import DraggablePanel from './DraggablePanel'
 import logo from '../../assets/data/Security Club Logo.png'
 
@@ -308,7 +309,7 @@ function RouteContent({ route, requestedPath, session, loading }: {
   loading: boolean
 }): ReactNode {
   if (!route) {
-    return <div className="page"><section className="auth-page"><div className="card auth-card"><h2>Page not found</h2><p className="muted">No page exists at <strong>{requestedPath}</strong>.</p></div></section></div>
+    return <NotFoundPage requestedPath={requestedPath} />
   }
 
   const requiresAccess = route.requiredRole !== 'visitor' || Boolean(route.requiredPermission) || Boolean(route.requiredPosition) || Boolean(route.anonymousOnly)
