@@ -1,173 +1,250 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import TeamCard from '../../components/cards/TeamCard'
-import SectionHeader from '../../components/common/SectionHeader'
-import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
-import Button from '../../components/ui/Button'
-import { archiveTeamMember, createTeamMember, getAuthSession, getTeamMembers } from '../../api/client'
-import { team } from '../../data/team'
-import type { TeamMember } from '../../types'
+import { useEffect, useState } from 'react'
+import { getTeam } from '../../api/client'
+import { team as defaultTeam, type TeamMember } from '../../data/team'
 
-async function compressPhoto(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  const context = canvas.getContext('2d')
-  if (!context) throw new Error('Unable to prepare this photo')
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close()
-  return canvas.toDataURL('image/jpeg', 0.82)
+function departmentOf(role: string): string {
+  const r = String(role || '').toLowerCase()
+  if (/president/i.test(r)) return 'leadership'
+  if (/technical/i.test(r)) return 'technical'
+  if (/research/i.test(r)) return 'research'
+  if (/event|publicity/i.test(r)) return 'events'
+  if (/editorial|design/i.test(r)) return 'design'
+  return 'other'
 }
 
-function TeamPage() {
-  const [members, setMembers] = useState<TeamMember[]>(team)
-  const [canManage, setCanManage] = useState(false)
-  const [showForm, setShowForm] = useState(false)
-  const [showAccessNotice, setShowAccessNotice] = useState(false)
-  const [name, setName] = useState('')
-  const [role, setRole] = useState('')
-  const [description, setDescription] = useState('')
-  const [photo, setPhoto] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+export default function TeamPage() {
+  const [members, setMembers] = useState<TeamMember[]>(defaultTeam)
+  const [selectedYear, setSelectedYear] = useState('2026-27')
+  const [selectedDept, setSelectedDept] = useState('all')
 
   useEffect(() => {
     let active = true
-    getTeamMembers()
-      .then((databaseMembers) => {
-        if (active) setMembers(databaseMembers)
-      })
-      .catch((loadError: unknown) => {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Unable to load team members from the database')
-      })
-    getAuthSession()
-      .then((session) => {
-        if (active) setCanManage(session.authenticated && session.permissions.includes('team.manage'))
+    getTeam()
+      .then((data: TeamMember[]) => {
+        if (!active) return
+        if (data && data.length > 0) {
+          const merged = data.map((apiItem: TeamMember) => {
+            const fallback = defaultTeam.find(
+              (t) => t.name.toLowerCase() === apiItem.name.toLowerCase()
+            )
+            return {
+              ...apiItem,
+              department: apiItem.department || fallback?.department || departmentOf(apiItem.role),
+              tenure: apiItem.tenure || fallback?.tenure || '2026-27',
+              linkedin: apiItem.linkedin || fallback?.linkedin,
+              bio: apiItem.description || apiItem.bio || fallback?.bio || fallback?.description,
+              image: apiItem.image || fallback?.image || '',
+            }
+          })
+          setMembers(merged)
+        }
       })
       .catch(() => {
-        if (active) setCanManage(false)
+        // Fallback already set
       })
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [])
 
-  const selectPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    try {
-      setError(null)
-      setPhoto(await compressPhoto(file))
-    } catch {
-      setError('Unable to load this photo. Please choose another image.')
-    }
-    event.target.value = ''
-  }
+  const mentors = members.filter(
+    (m) =>
+      (/faculty|mentor|teacher/i.test(m.role || '') || m.department === 'faculty') &&
+      !/alumni/i.test(m.role || '') &&
+      m.department !== 'alumni'
+  )
 
-  const addMember = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!photo) {
-      setError('Choose a member photo before adding the profile.')
-      return
-    }
-    setSaving(true)
-    setError(null)
-    try {
-      const savedMember = await createTeamMember({
-        name: name.trim(),
-        role: role.trim(),
-        image: photo,
-        ...(description.trim() ? { description: description.trim() } : {}),
-      })
-      setMembers((current) => [...current, savedMember])
-      setName('')
-      setRole('')
-      setDescription('')
-      setPhoto(null)
-      setShowForm(false)
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save team member to the database')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const alumni = members.filter(
+    (m) => /alumni/i.test(m.role || '') || m.department === 'alumni'
+  )
 
-  const removeMember = async (member: TeamMember) => {
-    if (!canManage || !window.confirm(`Remove ${member.name} from the public Team page?`)) return
-    try {
-      await archiveTeamMember(member.id)
-      setMembers((current) => current.filter((item) => item.id !== member.id))
-    } catch (removeError) {
-      setError(removeError instanceof Error ? removeError.message : 'Unable to remove team member')
-    }
+  const coreTeam = members.filter(
+    (m) => !/faculty|mentor|teacher|alumni/i.test(m.role || '')
+  )
+
+  const years = Array.from(
+    new Set(coreTeam.map((m) => m.tenure || '2026-27'))
+  )
+
+  const filteredCoreTeam = coreTeam.filter((m) => {
+    const matchesYear = !m.tenure || m.tenure === selectedYear
+    const dept = m.department || departmentOf(m.role)
+    const matchesDept = selectedDept === 'all' || dept === selectedDept
+    return matchesYear && matchesDept
+  })
+
+  const renderCard = (item: TeamMember) => {
+    const deptCode = item.department
+      ? item.department.toUpperCase()
+      : item.role && /faculty|coordinator|mentor/i.test(item.role)
+        ? 'FACULTY'
+        : item.role && /alumni/i.test(item.role)
+          ? 'ALUMNI'
+          : 'MEMBER'
+    const tenureTag = item.tenure || (item.role && /alumni/i.test(item.role) ? 'ALUMNI' : 'MENTOR')
+    const isLeader = /president/i.test(item.role || '')
+
+    return (
+      <article
+        key={item.name}
+        className={`card team-card ${isLeader ? 'is-leadership' : ''}`}
+      >
+        <div className="team-card-header">
+          <span className="team-dept-pill">{deptCode}</span>
+        </div>
+
+        {item.image ? (
+          <a
+            className="team-image-link"
+            href={item.image}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`View full-size photo of ${item.name}`}
+          >
+            <div className="team-photo-wrapper">
+              <img
+                src={item.image}
+                alt={item.name}
+                className="team-photo is-loaded"
+                loading="lazy"
+              />
+              <div className="team-photo-scrim" aria-hidden="true" />
+              <span className="team-tenure-badge">{tenureTag}</span>
+            </div>
+          </a>
+        ) : (
+          <div className="team-photo-wrapper team-photo-placeholder" aria-hidden="true">
+            <div className="team-avatar-fallback">
+              {(item.name || 'SC').slice(0, 2).toUpperCase()}
+            </div>
+            <span className="team-tenure-badge">{tenureTag}</span>
+          </div>
+        )}
+
+        <div className="card-body team-card-body">
+          <p className="team-role-tag">{item.role || 'Member'}</p>
+          <h3 className="team-member-name">{item.name}</h3>
+          <div className="team-card-divider" aria-hidden="true" />
+          {(item.bio || item.description) && (
+            <p className="team-member-bio">{item.bio || item.description}</p>
+          )}
+
+          {item.linkedin ? (
+            <a
+              className="team-linkedin-link"
+              href={item.linkedin}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`LinkedIn profile for ${item.name}`}
+              title="View LinkedIn Profile"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14">
+                <path
+                  fill="currentColor"
+                  d="M5.2 3.5a2.2 2.2 0 1 1-.1 4.4 2.2 2.2 0 0 1 .1-4.4ZM3.3 9.5h3.8v11.2H3.3zM9.2 9.5h3.6V11h.1a4 4 0 0 1 3.6-2c3.9 0 4.6 2.5 4.6 5.7v6h-3.8v-5.3c0-1.3 0-3-1.9-3s-2.2 1.4-2.2 2.9v5.4H9.2z"
+                />
+              </svg>
+              <span>LinkedIn</span>
+              <span className="team-link-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </a>
+          ) : null}
+        </div>
+      </article>
+    )
   }
 
   return (
-    <DraggableWorkspace pageKey="team">
-      <SectionHeader
-        eyebrow="Team"
-        title="Meet the Builders"
-        subtitle="Mentors, organizers, and competitive participants behind club initiatives."
-      />
+    <div className="page section-shell">
+      <section className="page-hero">
+        <div>
+          <p className="eyebrow">Meet the club team</p>
+          <h1>The people behind the signal.</h1>
+          <p className="hero-lede">
+            Meet the faculty mentors and student core team who make cybersecurity approachable,
+            practical and collaborative.
+          </p>
+        </div>
+      </section>
 
-      <div className="team-toolbar">
-        <Button type="button" onClick={() => {
-          if (canManage) {
-            setShowAccessNotice(false)
-            setShowForm((visible) => !visible)
-          } else {
-            setShowAccessNotice(true)
-          }
-        }}>
-          + Add member
-        </Button>
-      </div>
-
-      {showAccessNotice && !canManage && (
-        <p className="team-access-note" role="status">
-          Adding members requires a signed-in admin or a user with the President position. <a href="/login">Log in</a>
-        </p>
-      )}
-
-      {canManage && showForm && (
-        <form className="team-add-form" onSubmit={addMember}>
-          <div className="team-form-fields">
-            <label>
-              Photo
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={selectPhoto} required={!photo} />
-            </label>
-            {photo && <img className="team-photo-preview" src={photo} alt="Selected team member preview" />}
-            <label>
-              Name
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" required />
-            </label>
-            <label>
-              Position
-              <input value={role} onChange={(event) => setRole(event.target.value)} placeholder="Club position" required />
-            </label>
-            <label className="team-description-field">
-              Description <span>(optional)</span>
-              <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="A short introduction" rows={3} />
-            </label>
+      <section className="team-section" aria-labelledby="team-mentors-heading">
+        <div className="team-section-heading">
+          <div className="section-heading-meta">
+            <span className="section-tag-dot" aria-hidden="true" />
+            <p className="eyebrow">Academic Advisory · DBIT</p>
           </div>
-          {error ? <p className="form-error" role="alert">{error}</p> : null}
-          <div className="team-form-actions">
-            <Button type="button" variant="secondary" onClick={() => { setShowForm(false); setError(null) }} disabled={saving}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Add team member'}</Button>
-          </div>
-        </form>
-      )}
+          <h2 id="team-mentors-heading">Mentors &amp; Faculty Guidance</h2>
+          <p>Faculty coordinators and teachers supporting the club with institutional expertise.</p>
+        </div>
+        <div className="card-grid team-grid">{mentors.map(renderCard)}</div>
+      </section>
 
-      <div className="grid three">
-        {members.map((member) => (
-          <div className="team-member-item" key={member.id}>
-            <TeamCard member={member} />
-            {canManage ? <button className="gallery-delete" type="button" onClick={() => removeMember(member)}>Remove member</button> : null}
+      <section className="team-section" aria-labelledby="team-alumni-heading">
+        <div className="team-section-heading">
+          <div className="section-heading-meta">
+            <span className="section-tag-dot" aria-hidden="true" />
+            <p className="eyebrow">Our Foundation &amp; Heritage</p>
           </div>
-        ))}
-      </div>
-    </DraggableWorkspace>
+          <h2 id="team-alumni-heading">Alumni Network</h2>
+          <p>Former members who built the club and now defend systems across industry.</p>
+        </div>
+        <div className="card-grid team-grid">{alumni.map(renderCard)}</div>
+      </section>
+
+      <section className="team-section" aria-labelledby="team-core-heading">
+        <div className="team-section-heading">
+          <div className="section-heading-meta">
+            <span className="section-tag-dot" aria-hidden="true" />
+            <p className="eyebrow">Student Leadership Council</p>
+          </div>
+          <h2 id="team-core-heading">Core Team</h2>
+          <p>The student council and coordinators leading the Security Club initiatives.</p>
+        </div>
+
+        <div className="team-controls-bar">
+          <div className="team-years" role="group" aria-label="Select Core Team tenure year">
+            {years.map((year) => (
+              <button
+                key={year}
+                className={`gallery-year-button team-year-button ${year === selectedYear ? 'is-active' : ''}`}
+                type="button"
+                aria-pressed={year === selectedYear}
+                onClick={() => setSelectedYear(year)}
+              >
+                {year}
+              </button>
+            ))}
+          </div>
+
+          <div className="team-filters" role="group" aria-label="Filter core team by department">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'leadership', label: 'Leadership' },
+              { id: 'technical', label: 'Technical' },
+              { id: 'research', label: 'Research' },
+              { id: 'events', label: 'Events & PR' },
+              { id: 'design', label: 'Design & Editorial' },
+            ].map((dept) => (
+              <button
+                key={dept.id}
+                className={`team-filter-button ${selectedDept === dept.id ? 'is-active' : ''}`}
+                type="button"
+                aria-pressed={selectedDept === dept.id}
+                onClick={() => setSelectedDept(dept.id)}
+              >
+                {dept.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {filteredCoreTeam.length === 0 ? (
+          <p className="team-empty">Core team members will be listed here.</p>
+        ) : (
+          <div className="card-grid team-grid">{filteredCoreTeam.map(renderCard)}</div>
+        )}
+      </section>
+    </div>
   )
 }
-
-export default TeamPage

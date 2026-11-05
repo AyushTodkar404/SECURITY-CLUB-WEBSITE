@@ -1,61 +1,112 @@
 import { Link } from 'react-router-dom'
-import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
-import SectionHeader from '../../components/common/SectionHeader'
-import Button from '../../components/ui/Button'
 
-const principles = [
-  ['Curiosity', 'We ask how things work, then learn responsibly and deeply.'],
-  ['Community', 'We grow through collaboration, inclusion, and knowledge sharing.'],
-  ['Responsibility', 'We use security knowledge ethically to reduce harm and build trust.'],
-  ['Practice', 'We turn ideas into confidence through labs, challenges, and real projects.'],
-]
-
-function AboutPage() {
+export default function AboutPage() {
   return (
-    <DraggableWorkspace pageKey="about">
-      <section className="about-hero">
-        <p className="eyebrow">About Security Club</p>
-        <h1>Hack. Defend. Secure.</h1>
-        <p>
-          We are a student-led cybersecurity community creating a safe place to explore,
-          learn, and use technology with purpose.
-        </p>
-      </section>
-
-      <section className="about-manifesto">
-        <p className="manifesto-marker">// OUR MOTTO</p>
-        <blockquote>Learn with curiosity. Build with care. Defend with purpose.</blockquote>
-        <p>
-          Security is not only about tools and threats. It is about people, trust, and the
-          confidence to make the digital spaces around us safer.
-        </p>
-      </section>
-
-      <section className="grid three purpose-grid">
-        <article className="card purpose-card"><p className="eyebrow">Vision</p><h2>A safer, more capable digital community.</h2><p>We envision students who understand technology, think critically about risk, and help shape a more secure future.</p></article>
-        <article className="card purpose-card"><p className="eyebrow">Mission</p><h2>Make security learning practical and accessible.</h2><p>We connect beginners and enthusiasts with workshops, hands-on challenges, mentors, and opportunities to apply what they learn.</p></article>
-        <article className="card purpose-card"><p className="eyebrow">Promise</p><h2>Everyone gets a place to begin.</h2><p>We welcome questions, celebrate progress, and make room for every member to discover their strengths.</p></article>
-      </section>
-
-      <section className="about-section-block">
-        <SectionHeader eyebrow="What guides us" title="Our club principles" subtitle="The values behind every workshop, challenge, and conversation." />
-        <div className="grid two">
-          {principles.map(([title, text], index) => (
-            <article className="card principle-card" key={title}>
-              <span>0{index + 1}</span><div><h3>{title}</h3><p>{text}</p></div>
-            </article>
-          ))}
+    <div className="page section-shell">
+      <section className="page-hero">
+        <div>
+          <p className="eyebrow">A club for first steps</p>
+          <h1>Learn how the digital world works—and how to protect it.</h1>
+          <p className="hero-lede">
+            A student-led space to understand technology, question assumptions and practise
+            defending the systems we depend on.
+          </p>
         </div>
       </section>
 
-      <section className="about-section-block about-story">
-        <p className="eyebrow">Our story, in progress</p>
-        <h2>A place to learn together—and then give back.</h2>
-        <p>Security Club brings people together around shared experiments: a first Linux command, a solved CTF flag, a safer piece of code, or an event that helps someone discover a new path. Every member adds to that story.</p>
-        <Link to="/membership"><Button>Become part of the story</Button></Link>
+      <div className="split-content">
+        <article className="info-panel">
+          <p className="eyebrow">Our purpose</p>
+          <h2>Security is a team sport.</h2>
+          <p>
+            We believe cybersecurity grows through curiosity, responsible practice and people willing
+            to share what they learn.
+          </p>
+        </article>
+        <article className="info-panel">
+          <p className="eyebrow">Our principles</p>
+          <h2>Learn openly. Build responsibly.</h2>
+          <p>
+            We create beginner-friendly spaces for secure coding, digital safety, ethical hacking,
+            research and defence.
+          </p>
+        </article>
+      </div>
+
+      <div className="about-vision-mission">
+        <section className="info-panel course-panel" aria-labelledby="about-vision-heading">
+          <p className="eyebrow">Our Vision</p>
+          <h2 id="about-vision-heading">A secure and socially responsible digital ecosystem</h2>
+          <p>
+            To establish a center in the field of security that develops ethically grounded,
+            industry-ready professionals who innovate, research, and contribute to building a secure
+            and socially responsible digital ecosystem.
+          </p>
+        </section>
+
+        <section className="info-panel course-panel" aria-labelledby="about-mission-heading">
+          <p className="eyebrow">Our Mission</p>
+          <h2 id="about-mission-heading">Learn, act ethically, and keep innovating</h2>
+          <ul className="mission-list">
+            <li>
+              To develop industry-ready security professionals through hands-on training, practical
+              exposure, and modern tools.
+            </li>
+            <li>
+              To foster ethical practices, digital responsibility, and integrity in the use of
+              technology.
+            </li>
+            <li>
+              To promote innovation, research, and continuous learning while preparing students for
+              certifications, careers, and real-world challenges.
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <div className="about-coursework">
+        <section className="info-panel course-panel" aria-labelledby="course-objectives-heading">
+          <p className="eyebrow">Course Objectives</p>
+          <h2 id="course-objectives-heading">Key objectives of the Security Club</h2>
+          <p>The key objectives of the Security Club are:</p>
+          <ol className="course-objectives">
+            <li>To provide training in industry-relevant cybersecurity tools, frameworks, and methodologies.</li>
+            <li>To enhance students’ preparedness for internships, certifications, and placements in cybersecurity roles.</li>
+            <li>To encourage research, innovation, and project-based learning within security domains.</li>
+            <li>To promote ethical hacking practices through structured awareness programs and practical sessions.</li>
+            <li>To foster responsible digital conduct through interactive workshops and seminars.</li>
+          </ol>
+        </section>
+
+        <section className="info-panel course-panel" aria-labelledby="course-outcomes-heading">
+          <p className="eyebrow">Course Outcomes (COs)</p>
+          <h2 id="course-outcomes-heading">Students will be able to:</h2>
+          <div className="course-outcomes">
+            <article className="course-outcome">
+              <h3>CO1</h3>
+              <p>Define fundamental digital security concepts, threats, vulnerabilities and ethical principles, and explain industry practices, commonly used cybersecurity tools and methodologies.</p>
+            </article>
+            <article className="course-outcome">
+              <h3>CO2</h3>
+              <p>Apply digital security concepts, tools, and methodologies to implement security practices and address cybersecurity challenges through practical hands-on activities and competitions.</p>
+            </article>
+            <article className="course-outcome">
+              <h3>CO3</h3>
+              <p>Analyze digital security threats, vulnerabilities, security solutions, and ethical implications to determine appropriate mitigation strategies and evaluate their effectiveness in practical scenarios.</p>
+            </article>
+            <article className="course-outcome">
+              <h3>CO4</h3>
+              <p>Create innovative digital security solutions, awareness initiatives, and technical portfolios to address identified security challenges while demonstrating teamwork, effective communication, and responsible digital conduct.</p>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <section style={{ margin: '3rem 0', textAlign: 'center' }}>
+        <Link className="button button-primary" to="/membership">
+          Become part of the story →
+        </Link>
       </section>
-    </DraggableWorkspace>
+    </div>
   )
 }
-
-export default AboutPage

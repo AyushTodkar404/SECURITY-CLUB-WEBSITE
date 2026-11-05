@@ -1,79 +1,202 @@
 .security-logo {
-    position: relative;
-    display: block;
+  position: relative;
+  display: block;
+  width: min(100%, var(--logo-size, 420px));
+  aspect-ratio: 1;
+  margin-inline: auto;
+  pointer-events: none;
 }
 
 .security-logo svg {
-    display: block;
-    overflow: visible;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-/* Main tracing animation */
-
-.trace-path {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    opacity: 0;
-
-    filter:
-        drop-shadow(0 0 3px rgba(0, 234, 255, 0.8)) drop-shadow(0 0 8px rgba(0, 234, 255, 0.35));
+.security-logo .trace-path {
+  fill: none;
+  stroke: #00eaff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 3px rgba(0, 234, 255, .8)) drop-shadow(0 0 8px rgba(0, 234, 255, .35));
 }
 
-/*
-  pathLength="1" makes every path use the same
-  normalized dash range regardless of actual length.
-*/
-
-.security-logo.playing .trace-path {
-    animation:
-        trace-draw var(--duration) cubic-bezier(0.45, 0, 0.2, 1) var(--delay) forwards;
+.security-logo .logo-web {
+  filter: drop-shadow(0 0 2px rgba(0, 234, 255, .45));
 }
 
-@keyframes trace-draw {
-    0% {
-        stroke-dashoffset: 1;
-        opacity: 0;
-    }
-
-    5% {
-        opacity: 1;
-    }
-
-    100% {
-        stroke-dashoffset: 0;
-        opacity: 1;
-    }
+.security-logo .web .trace-path {
+  stroke-width: 1.5;
+  filter: none;
 }
 
-/* Web should remain delicate */
-
-.web .trace-path {
-    filter:
-        drop-shadow(0 0 2px rgba(0, 234, 255, 0.65));
+.security-logo .trace-path.shield {
+  stroke-width: 10;
+  filter: drop-shadow(0 0 5px #00eaff) drop-shadow(0 0 14px rgba(0, 234, 255, .45));
 }
 
-/* Shield gets stronger glow */
-
-.shield {
-    filter:
-        drop-shadow(0 0 5px rgba(0, 234, 255, 1)) drop-shadow(0 0 14px rgba(0, 234, 255, 0.45));
+.security-logo .trace-path.node-dot {
+  fill: #00eaff;
+  stroke: none;
+  filter: drop-shadow(0 0 4px rgba(0, 234, 255, .9));
 }
 
-/* Network mesh node dots */
-
-.node-dot {
-    stroke-dasharray: unset;
-    stroke-dashoffset: unset;
-    opacity: 0;
+.security-logo .logo-mesh .trace-path {
+  filter: none;
 }
 
-.security-logo.playing .node-dot {
-    animation:
-        node-appear var(--duration) ease-out var(--delay) forwards;
+.security-logo .logo-orbit {
+  fill: none;
+  stroke: #00eaff;
 }
 
-@keyframes node-appear {
-    0%   { opacity: 0; r: 2; }
-    50%  { opacity: 1; r: 5; }
-    100% { opacity: 1; r: 4; }
+.security-logo .logo-orbit-outer {
+  stroke-width: 2;
+  stroke-opacity: .2;
+}
+
+.security-logo .logo-orbit-inner {
+  stroke-width: 2;
+  stroke-opacity: .35;
+  stroke-dasharray: 5 14;
+}
+
+.security-logo .green-orbit-spinner {
+  transform-box: fill-box;
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transform-origin: 537px 537px;
+  animation: security-logo-orbit 3.6s linear infinite;
+  will-change: transform;
+}
+
+.security-logo .green-orbit-spinner.reverse {
+  animation-direction: reverse;
+}
+
+.security-logo.is-animating .green-orbit-spinner {
+  opacity: 1;
+  transform-box: fill-box;
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transform-origin: 537px 537px;
+  animation: security-logo-orbit 3.6s linear infinite,
+    security-green-orbit-reveal .4s ease-out forwards;
+}
+
+.security-logo.is-animating .green-orbit-spinner.reverse {
+  animation-direction: reverse, normal;
+}
+
+.security-logo .logo-orbit-green-track {
+  stroke: #00ff78;
+  stroke-width: 5;
+  stroke-opacity: .18;
+}
+
+.security-logo .logo-orbit-green {
+  stroke: #00ff78;
+  stroke-width: 5;
+  stroke-opacity: 1;
+  stroke-dasharray: 76 24;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(0, 255, 120, .9)) drop-shadow(0 0 10px rgba(0, 255, 120, .45));
+}
+
+.security-logo .logo-outline {
+  stroke-opacity: .72;
+  animation: security-shield-pulse 2.8s ease-in-out infinite;
+  will-change: stroke-opacity;
+}
+
+.security-logo.is-animating .logo-outline {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: security-logo-draw 0.8s cubic-bezier(.45, 0, .2, 1) 0.1s forwards,
+    security-shield-pulse 2.8s ease-in-out 0.9s infinite;
+}
+
+.security-logo.is-animating .logo-divider-vertical {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: security-logo-draw 0.6s ease-out 0.2s forwards;
+}
+
+.security-logo.is-animating .logo-divider-horizontal {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: security-logo-draw 0.6s ease-out 0.25s forwards;
+}
+
+.security-logo.is-animating .logo-orbit-outer {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: security-logo-draw 0.75s ease-out 0.05s forwards;
+}
+
+.security-logo.is-animating .logo-orbit-inner {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: security-logo-draw 0.7s ease-out 0.1s forwards;
+}
+
+.security-logo.is-animating .logo-web .web-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: security-logo-draw 0.35s ease-out calc(0.15s + var(--trace-delay, 0s)) forwards;
+}
+
+.security-logo.is-animating .logo-mesh .mesh-edge {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation: security-logo-draw 0.3s ease-out calc(0.25s + var(--trace-delay, 0s)) forwards;
+}
+
+.security-logo.is-animating .node-dot {
+  opacity: 0;
+  animation: security-logo-fade 0.25s ease-out calc(0.35s + var(--trace-delay, 0s)) forwards;
+}
+
+@keyframes security-logo-draw {
+  0% { stroke-dashoffset: 1; opacity: 0; }
+  8% { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes security-logo-fade {
+  to { opacity: 1; }
+}
+
+@keyframes security-green-orbit-reveal {
+  to { opacity: 1; }
+}
+
+@keyframes security-shield-pulse {
+  0%, 100% { stroke-opacity: .72; }
+  50% { stroke-opacity: 1; }
+}
+
+@keyframes security-logo-orbit {
+  from { transform: rotate(var(--orbit-start, 0deg)); }
+  to { transform: rotate(calc(var(--orbit-start, 0deg) + 360deg)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .security-logo.is-animating .trace-path,
+  .security-logo.is-animating .logo-orbit,
+  .security-logo.is-animating .green-orbit-spinner,
+  .security-logo.is-animating .node-dot {
+    animation: none !important;
+    opacity: 1 !important;
+    stroke-dashoffset: 0 !important;
+  }
 }

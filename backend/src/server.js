@@ -204,10 +204,10 @@ function audit(request, action, entityType, entityId, before, after) {
 function eventRow(idOrSlug, bySlug = false, includeDrafts = false) {
   const where = bySlug ? 'e.slug=?' : 'e.id=?'
   const row = db.prepare(`SELECT e.*, et.key AS type, et.name AS type_name FROM events e JOIN event_types et ON et.id=e.event_type_id
-    WHERE ${where}${includeDrafts ? '' : " AND e.status='published'"}`).get(idOrSlug)
+    WHERE ${where}${includeDrafts ? '' : " AND e.status IN ('published','completed')"}`).get(idOrSlug)
   if (!row) return null
   const tags = db.prepare('SELECT t.name,t.slug FROM tags t JOIN event_tags et ON et.tag_id=t.id WHERE et.event_id=? ORDER BY t.name').all(row.id)
-  return { ...row, date: row.starts_at, type: row.type, tags: tags.map((tag) => tag.name), tag_slugs: tags.map((tag) => tag.slug) }
+  return { ...row, date: row.starts_at, type: row.type, poster: row.image_url, tags: tags.map((tag) => tag.name), tag_slugs: tags.map((tag) => tag.slug) }
 }
 function eventManager(request, event) {
   if (roleOf(request) === 'admin') return true
@@ -478,7 +478,7 @@ app.get('/api/gallery/workspace', (_request, response, next) => {
     })
   } catch (error) { next(error) }
 })
-app.get('/api/team', (_request, response, next) => { try { send(response, db.prepare(`SELECT tp.id,COALESCE(tp.name_override,u.display_name) AS name,tp.role_title AS role,tp.image_url AS image,tp.description,tp.display_order FROM team_profiles tp LEFT JOIN users u ON u.id=tp.user_id WHERE tp.published=1 ORDER BY tp.display_order,tp.id`).all()) } catch (error) { next(error) } })
+app.get('/api/team', (_request, response, next) => { try { send(response, db.prepare(`SELECT tp.id,COALESCE(tp.name_override,u.display_name) AS name,tp.role_title AS role,tp.image_url AS image,tp.description,tp.linkedin_url AS linkedin,tp.department,tp.tenure,tp.display_order FROM team_profiles tp LEFT JOIN users u ON u.id=tp.user_id WHERE tp.published=1 ORDER BY tp.display_order,tp.id`).all()) } catch (error) { next(error) } })
 app.get('/api/testimonials', (_request, response, next) => { try { send(response, db.prepare("SELECT id,name,role_label AS role,quote,image_url FROM testimonials WHERE published=1 ORDER BY display_order,id").all()) } catch (error) { next(error) } })
 app.get('/api/site-settings', (_request, response, next) => {
   try {
@@ -802,36 +802,37 @@ app.get('/api/admin/memberships/pending-payment', requireAuth, requirePermission
   } catch (error) { next(error) }
 })
 
-app.post('/api/contact-messages', contactLimiter, (request, response, next) => {
+app.post(['/api/contact', '/api/contact-messages'], contactLimiter, (request, response, next) => {
   const deliverMessage = async () => {
     const name = value(request.body, 'name', { max: 160 }); const address = email(request.body); const message = value(request.body, 'message', { max: 5000 })
+    const result = db.prepare('INSERT INTO contact_messages(name,email,user_id,message,created_at) VALUES(?,?,?,?,?)').run(name, address, request.user?.id ?? null, message, now())
+    const insertedId = Number(result.lastInsertRowid)
+
     const smtpUser = process.env.SMTP_USER
     const smtpPassword = process.env.SMTP_PASSWORD
-    const recipient = process.env.CONTACT_EMAIL ?? 'securityclub@college.edu'
-    if (!smtpUser || !smtpPassword) throw fail(503, 'Email delivery is not configured yet. Please try again later or email the club directly.')
-
-    const secure = process.env.SMTP_SECURE !== 'false'
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT ?? (secure ? 465 : 587)),
-      secure,
-      auth: { user: smtpUser, pass: smtpPassword },
-    })
-    try {
-      await transporter.sendMail({
-        from: { name: process.env.SMTP_FROM_NAME ?? 'Security Club DBIT', address: smtpUser },
-        to: recipient,
-        replyTo: { name, address },
-        subject: `Website contact message from ${name}`,
-        text: `Name: ${name}\nEmail: ${address}\n\nMessage:\n${message}`,
-      })
-    } catch (mailError) {
-      console.error('Contact email delivery failed:', mailError)
-      throw fail(503, 'Unable to send your message right now. Please try again or email the club directly.')
+    if (smtpUser && smtpPassword) {
+      const recipient = process.env.CONTACT_EMAIL ?? 'securityclub@college.edu'
+      const secure = process.env.SMTP_SECURE !== 'false'
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
+          port: Number(process.env.SMTP_PORT ?? (secure ? 465 : 587)),
+          secure,
+          auth: { user: smtpUser, pass: smtpPassword },
+        })
+        await transporter.sendMail({
+          from: { name: process.env.SMTP_FROM_NAME ?? 'Security Club DBIT', address: smtpUser },
+          to: recipient,
+          replyTo: { name, address },
+          subject: `Website contact message from ${name}`,
+          text: `Name: ${name}\nEmail: ${address}\n\nMessage:\n${message}`,
+        })
+      } catch (mailError) {
+        console.error('Contact email delivery notification failed:', mailError)
+      }
     }
 
-    const result = db.prepare('INSERT INTO contact_messages(name,email,user_id,message,created_at) VALUES(?,?,?,?,?)').run(name, address, request.user?.id ?? null, message, now())
-    send(response, { id: Number(result.lastInsertRowid), status: 'new' }, 201)
+    send(response, { id: insertedId, status: 'new', message: 'Message sent successfully.' }, 201)
   }
   deliverMessage().catch(next)
 })
@@ -880,18 +881,34 @@ app.get('/api/me/dashboard', requireAuth, requireMember, (request, response, nex
     send(response, { user: request.user, membership: db.prepare(`SELECT m.*,p.name AS plan_name FROM memberships m JOIN membership_plans p ON p.id=m.plan_id WHERE m.user_id=? ORDER BY m.created_at DESC LIMIT 1`).get(request.user.id) ?? null, solved, registrations: db.prepare(`SELECT er.*,e.title,e.slug FROM event_registrations er JOIN events e ON e.id=er.event_id WHERE er.user_id=? ORDER BY er.registered_at DESC LIMIT 10`).all(request.user.id) })
   } catch (error) { next(error) }
 })
-app.get('/api/challenges', requireMember, (request, response, next) => { try { send(response, db.prepare(`SELECT c.id,c.title,c.slug,c.category,c.difficulty,c.points,c.description,c.status,EXISTS(SELECT 1 FROM challenge_solves s WHERE s.challenge_id=c.id AND s.user_id=?) AS solved FROM challenges c WHERE c.status='published' ORDER BY c.id`).all(request.user.id)) } catch (error) { next(error) } })
-app.post('/api/challenges/:id/submissions', requireMember, flagLimiter, (request, response, next) => {
+app.get('/api/challenges', (request, response, next) => {
   try {
-    const id = integer({ id: request.params.id }, 'id', { min: 1 }); const flag = value(request.body, 'flag', { max: 1000 }); const challenge = db.prepare("SELECT * FROM challenges WHERE id=? AND status='published'").get(id)
-    if (!challenge) throw fail(404, 'Challenge not found')
-    const correct = sha256(flag) === challenge.flag_hash; const timestamp = now()
-    db.prepare('INSERT INTO challenge_submissions(challenge_id,user_id,submitted_value_hash,is_correct,submitted_at) VALUES(?,?,?,?,?)').run(id, request.user.id, sha256(flag), correct ? 1 : 0, timestamp)
-    if (correct) db.prepare('INSERT OR IGNORE INTO challenge_solves(challenge_id,user_id,points_awarded,solved_at) VALUES(?,?,?,?)').run(id, request.user.id, challenge.points, timestamp)
-    send(response, { correct, solved: Boolean(db.prepare('SELECT 1 FROM challenge_solves WHERE challenge_id=? AND user_id=?').get(id, request.user.id)), points: correct ? challenge.points : 0 })
+    const userId = request.user?.id || null
+    const query = userId
+      ? "SELECT c.id,c.title,c.slug,c.category,c.difficulty,c.points,c.description,c.hint,c.status,EXISTS(SELECT 1 FROM challenge_solves s WHERE s.challenge_id=c.id AND s.user_id=?) AS solved FROM challenges c WHERE c.status='published' ORDER BY c.id"
+      : "SELECT c.id,c.title,c.slug,c.category,c.difficulty,c.points,c.description,c.hint,c.status,0 AS solved FROM challenges c WHERE c.status='published' ORDER BY c.id"
+    const rows = userId ? db.prepare(query).all(userId) : db.prepare(query).all()
+    send(response, rows)
   } catch (error) { next(error) }
 })
-app.get('/api/leaderboard', requireMember, (request, response, next) => { try { send(response, db.prepare(`SELECT u.id,u.display_name AS name,COALESCE(SUM(s.points_awarded),0) AS score,COUNT(s.id) AS solves FROM users u LEFT JOIN challenge_solves s ON s.user_id=u.id GROUP BY u.id ORDER BY score DESC,name LIMIT 100`).all()) } catch (error) { next(error) } })
+app.post('/api/challenges/:id/submissions', flagLimiter, (request, response, next) => {
+  try {
+    const id = integer({ id: request.params.id }, 'id', { min: 1 });
+    const flag = value(request.body, 'flag', { max: 1000 });
+    const challenge = db.prepare("SELECT * FROM challenges WHERE id=? AND status='published'").get(id)
+    if (!challenge) throw fail(404, 'Challenge not found')
+    const correct = sha256(flag) === challenge.flag_hash;
+    const timestamp = now()
+    const userId = request.user?.id || null
+    if (userId) {
+      db.prepare('INSERT INTO challenge_submissions(challenge_id,user_id,submitted_value_hash,is_correct,submitted_at) VALUES(?,?,?,?,?)').run(id, userId, sha256(flag), correct ? 1 : 0, timestamp)
+      if (correct) db.prepare('INSERT OR IGNORE INTO challenge_solves(challenge_id,user_id,points_awarded,solved_at) VALUES(?,?,?,?)').run(id, userId, challenge.points, timestamp)
+    }
+    const solved = userId ? Boolean(db.prepare('SELECT 1 FROM challenge_solves WHERE challenge_id=? AND user_id=?').get(id, userId)) : correct
+    send(response, { correct, solved, points: correct ? challenge.points : 0 })
+  } catch (error) { next(error) }
+})
+app.get('/api/leaderboard', (request, response, next) => { try { send(response, db.prepare(`SELECT u.id,u.display_name AS name,COALESCE(SUM(s.points_awarded),0) AS score,COUNT(s.id) AS solves FROM users u LEFT JOIN challenge_solves s ON s.user_id=u.id GROUP BY u.id ORDER BY score DESC,name LIMIT 100`).all()) } catch (error) { next(error) } })
 
 function requireReview(request, _response, next) { return requirePermission('membership.review')(request, _response, next) }
 const applicationSelect = `SELECT a.id,a.status,a.interest_area,a.motivation,a.submitted_at,a.updated_at,

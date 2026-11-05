@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getAuthSession, logout } from '../../api/client'
-import SectionHeader from '../../components/common/SectionHeader'
-import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import type { AuthSession } from '../../types'
 
 interface ProfilePageProps {
@@ -10,7 +8,7 @@ interface ProfilePageProps {
   onSessionChange?: (session: AuthSession) => void
 }
 
-function ProfilePage({ session, onSessionChange }: ProfilePageProps) {
+export default function ProfilePage({ session, onSessionChange }: ProfilePageProps) {
   const navigate = useNavigate()
   const [loadedSession, setLoadedSession] = useState<AuthSession | null>(session ?? null)
 
@@ -20,7 +18,15 @@ function ProfilePage({ session, onSessionChange }: ProfilePageProps) {
   }, [session, navigate])
 
   const currentSession = session ?? loadedSession
-  if (!currentSession) return <DraggableWorkspace pageKey="profile"><section className="auth-page"><div className="card auth-card"><p className="muted">Loading profile…</p></div></section></DraggableWorkspace>
+  if (!currentSession) {
+    return (
+      <div className="page section-shell">
+        <section className="page-hero">
+          <p className="muted">Loading profile…</p>
+        </section>
+      </div>
+    )
+  }
 
   const handleLogout = async () => {
     try {
@@ -38,68 +44,81 @@ function ProfilePage({ session, onSessionChange }: ProfilePageProps) {
   }
 
   return (
-    <DraggableWorkspace pageKey="profile">
-      <SectionHeader
-        eyebrow="Account"
-        title="Profile"
-        subtitle="Manage your club identity, access, and membership status."
-      />
+    <div className="page section-shell">
+      <section className="page-hero">
+        <div>
+          <p className="eyebrow">Account</p>
+          <h1>Profile</h1>
+          <p className="hero-lede">Manage your club identity, access, and membership status.</p>
+        </div>
+      </section>
 
-      <div className="card profile-card">
-        <div className="profile-header-row">
-          <div className="profile-avatar" aria-hidden="true">
+      <div className="card profile-card" style={{ margin: '2rem 0', padding: '1.5rem' }}>
+        <div className="profile-header-row" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div
+            className="profile-avatar"
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: 'var(--surface-elevated)',
+              display: 'grid',
+              placeItems: 'center',
+              fontWeight: 600,
+              color: 'var(--cyan)',
+            }}
+          >
             {currentSession.user?.displayName?.charAt(0)?.toUpperCase() ?? 'S'}
           </div>
           <div>
-            <h3>{currentSession.user?.displayName ?? 'Security Club Member'}</h3>
-            <p className="muted">{currentSession.user?.email ?? 'No email available'}</p>
+            <h3 style={{ margin: 0 }}>{currentSession.user?.displayName ?? 'Security Club Member'}</h3>
+            <p className="muted" style={{ margin: 0, color: 'var(--muted)' }}>
+              {currentSession.user?.email ?? 'No email available'}
+            </p>
           </div>
         </div>
 
-        <div className="profile-meta-grid">
-          <div className="card info-block">
+        <div
+          className="profile-meta-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: '1rem',
+            marginTop: '1.5rem',
+          }}
+        >
+          <div className="card info-block" style={{ padding: '1rem' }}>
             <span className="eyebrow subtle">Role</span>
-            <strong>{currentSession.role}</strong>
+            <strong style={{ display: 'block', marginTop: '0.3rem' }}>{currentSession.role.toUpperCase()}</strong>
           </div>
-          <div className="card info-block">
+          <div className="card info-block" style={{ padding: '1rem' }}>
             <span className="eyebrow subtle">Permissions</span>
-            <strong>{currentSession.permissions.length}</strong>
+            <strong style={{ display: 'block', marginTop: '0.3rem' }}>{currentSession.permissions.length}</strong>
           </div>
-          <div className="card info-block">
+          <div className="card info-block" style={{ padding: '1rem' }}>
             <span className="eyebrow subtle">Positions</span>
-            <strong>{currentSession.positions.length}</strong>
+            <strong style={{ display: 'block', marginTop: '0.3rem' }}>{currentSession.positions.length}</strong>
           </div>
         </div>
       </div>
 
-      <div className="card">
-        <h3>Access overview</h3>
-        <ul className="plain-list">
-          {currentSession.permissions.length > 0 ? (
-            currentSession.permissions.map((permission) => <li key={permission}>{permission}</li>)
-          ) : (
-            <li>No explicit permissions granted yet.</li>
-          )}
-        </ul>
+      <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+        <button
+          type="button"
+          className="button button-ghost"
+          onClick={() => navigate('/dashboard')}
+        >
+          Open Dashboard →
+        </button>
+        <button
+          type="button"
+          className="button button-ghost"
+          style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+          onClick={handleLogout}
+        >
+          Log out
+        </button>
       </div>
-
-      <div className="card">
-        <h3>Position assignments</h3>
-        <ul className="plain-list">
-          {currentSession.positions.length > 0 ? (
-            currentSession.positions.map((position) => <li key={position.key}>{position.name}</li>)
-          ) : (
-            <li>No core positions assigned.</li>
-          )}
-        </ul>
-      </div>
-
-      <div className="actions compact-actions">
-        <button type="button" className="button button-secondary" onClick={() => navigate('/dashboard')}>Open dashboard</button>
-        <button type="button" className="button button-danger" onClick={handleLogout}>Log out</button>
-      </div>
-    </DraggableWorkspace>
+    </div>
   )
 }
-
-export default ProfilePage

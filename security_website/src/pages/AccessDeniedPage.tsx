@@ -1,21 +1,31 @@
-import DraggableWorkspace from '../components/layout/DraggableWorkspace'
+import { Link } from 'react-router-dom'
 
 interface AccessDeniedPageProps {
-  requestedPath: string
+  requestedPath?: string
 }
 
-function AccessDeniedPage({ requestedPath }: AccessDeniedPageProps) {
+export default function AccessDeniedPage({ requestedPath }: AccessDeniedPageProps) {
+  const path = requestedPath || (typeof window !== 'undefined' ? window.location.pathname : '')
+
   return (
-    <DraggableWorkspace pageKey="access-denied">
-      <section className="auth-page">
-        <div className="card auth-card">
-          <h2>Access denied</h2>
-          <p className="muted">You do not have permission to open <strong>{requestedPath}</strong>.</p>
-          <p className="muted">This area requires a higher role, a specific permission, or a matching division position.</p>
+    <div className="page section-shell">
+      <section className="page-hero">
+        <div>
+          <p className="eyebrow" style={{ color: '#ef4444' }}>Access Restriction</p>
+          <h1>Access denied</h1>
+          <p className="hero-lede">
+            You do not have permission to view <code>{path}</code>. This area requires member login or elevated administrative permissions.
+          </p>
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+            <Link className="button button-primary" to="/auth">
+              Sign in with credentials →
+            </Link>
+            <Link className="button button-ghost" to="/">
+              Return home
+            </Link>
+          </div>
         </div>
       </section>
-    </DraggableWorkspace>
+    </div>
   )
 }
-
-export default AccessDeniedPage

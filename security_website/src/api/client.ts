@@ -425,3 +425,14 @@ export async function getLeaderboard(): Promise<{ id: number; name: string; scor
 }
 
 export type { CorePosition }
+
+export const getTeam = getTeamMembers
+export const submitContact = sendContactMessage
+
+export async function getDashboard(): Promise<unknown> {
+  return request('/dashboard')
+}
+
+export async function getGallery(): Promise<{ id: number; image_url: string; caption: string }[]> {
+  return request('/gallery')
+}

@@ -2,15 +2,19 @@ export const roles = ['admin', 'core', 'member', 'visitor']
 
 export const pageAccess = {
   '/': 'visitor',
+  '/about': 'visitor',
+  '/awareness': 'visitor',
   '/events': 'visitor',
+  '/flagships': 'visitor',
+  '/team': 'visitor',
   '/gallery': 'visitor',
-  '/contact': 'visitor',
-  '/dashboard': 'member',
-  '/ctf': 'member',
-  '/leaderboard': 'member',
+  '/leaderboard': 'visitor',
   '/membership': 'visitor',
-  '/team': 'core',
-  '/flagships': 'core',
+  '/submission': 'visitor',
+  '/contact': 'visitor',
+  '/ctf': 'visitor',
+  '/dashboard': 'member',
+  '/profile': 'member',
   '/admin': 'admin',
 }
 

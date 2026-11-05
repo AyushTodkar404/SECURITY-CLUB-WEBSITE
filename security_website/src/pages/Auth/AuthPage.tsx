@@ -1,21 +1,26 @@
 import { Link } from 'react-router-dom'
-import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
 import { LoginForm } from './LoginPage'
 
-function AuthPage() {
+export default function AuthPage() {
   return (
-    <DraggableWorkspace pageKey="auth">
+    <div className="page section-shell">
       <section className="auth-page auth-toggle-page">
-        <div className="card auth-card">
+        <div className="card auth-card" style={{ maxWidth: '480px', margin: '2rem auto' }}>
           <p className="eyebrow">Member access</p>
           <h1>Welcome back.</h1>
-          <p className="muted">Membership applications are reviewed by an administrator. Approved applicants can sign in with their existing password or a temporary password provided by the club.</p>
+          <p className="muted" style={{ margin: '0.5rem 0 1.5rem', color: 'var(--muted)' }}>
+            Membership applications are reviewed by an administrator. Approved applicants can sign
+            in with their account credentials or a temporary password provided by the club.
+          </p>
           <LoginForm />
-          <p className="muted">New to Security Club? <Link className="auth-text-link" to="/membership">Apply for membership</Link></p>
+          <p className="muted" style={{ marginTop: '1.5rem', color: 'var(--muted)', textAlign: 'center' }}>
+            New to Security Club?{' '}
+            <Link className="auth-text-link" to="/membership" style={{ color: 'var(--cyan)' }}>
+              Apply for membership &rarr;
+            </Link>
+          </p>
         </div>
       </section>
-    </DraggableWorkspace>
+    </div>
   )
 }
-
-export default AuthPage

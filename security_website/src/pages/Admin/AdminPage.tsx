@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react'
-import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
-import SectionHeader from '../../components/common/SectionHeader'
 import {
   approveMembershipApplication,
   assignCorePosition,
@@ -187,12 +185,16 @@ function AdminPage() {
   }
 
   return (
-    <DraggableWorkspace pageKey="admin">
-      <SectionHeader
-        eyebrow="Administration"
-        title="Role and Permission Control"
-        subtitle="Turn individual read, comment, and write capabilities on or off for each role."
-      />
+    <div className="page section-shell">
+      <section className="page-hero">
+        <div>
+          <p className="eyebrow">Administrator Console</p>
+          <h1>Role and Permission Control</h1>
+          <p className="hero-lede">
+            Review membership applications, issue temporary credentials, and configure permissions.
+          </p>
+        </div>
+      </section>
       {error ? <p role="alert">{error}</p> : null}
       <section className="admin-applications">
         <div className="workspace-card-heading">
@@ -336,7 +338,7 @@ function AdminPage() {
           ))}
         </div>
       </article>
-    </DraggableWorkspace>
+    </div>
   )
 }
 

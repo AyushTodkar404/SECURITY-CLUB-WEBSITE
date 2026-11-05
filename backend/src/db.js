@@ -1,4 +1,5 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import Database from 'libsql'
@@ -386,6 +387,156 @@ if (currentSchemaVersion < 8) {
     }
     db.prepare('INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)')
       .run(8, 'temporary account password changes', new Date().toISOString())
+    db.exec('COMMIT')
+  } catch (error) {
+    try { db.exec('ROLLBACK') } catch { /* preserve original migration error */ }
+    throw error
+  }
+}
+
+
+if (currentSchemaVersion < 9) {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    if (!columns('events').includes('image_url')) {
+      db.exec('ALTER TABLE events ADD COLUMN image_url TEXT')
+    }
+    if (!columns('team_profiles').includes('department')) {
+      db.exec("ALTER TABLE team_profiles ADD COLUMN department TEXT NOT NULL DEFAULT 'technical'")
+    }
+    if (!columns('team_profiles').includes('tenure')) {
+      db.exec("ALTER TABLE team_profiles ADD COLUMN tenure TEXT NOT NULL DEFAULT '2026-27'")
+    }
+    if (!columns('challenges').includes('hint')) {
+      db.exec('ALTER TABLE challenges ADD COLUMN hint TEXT')
+    }
+
+    db.prepare('INSERT OR IGNORE INTO event_types(key,name,description) VALUES(?,?,?)')
+      .run('competition', 'Competition', 'Inter-college technical competition')
+
+    const __dbDirname = dirname(fileURLToPath(import.meta.url))
+    const loadJson = (filename) => JSON.parse(readFileSync(resolve(__dbDirname, filename), 'utf8'))
+    const timestamp = new Date().toISOString()
+
+    // 1. Team Profiles
+    const staticTeam = loadJson('static_team.json')
+    db.exec('DELETE FROM team_profiles')
+    const insertTeam = db.prepare(`INSERT INTO team_profiles(name_override, role_title, image_url, description, department, tenure, linkedin_url, display_order, published)
+      VALUES(?,?,?,?,?,?,?,?,1)`)
+    staticTeam.forEach((member) => {
+      insertTeam.run(
+        member.name,
+        member.role,
+        member.image ? '/' + member.image.replace(/^\//, '') : '',
+        member.bio || '',
+        member.department || 'technical',
+        member.tenure || (member.role && /faculty|coordinator|mentor/i.test(member.role) ? 'Mentor' : '2026-27'),
+        member.linkedin || '',
+        member.rank ?? 50
+      )
+    })
+
+    // 2. Events
+    const staticEvents = loadJson('static_events.json')
+    const eventTypeId = (key) => db.prepare('SELECT id FROM event_types WHERE key=?').get(key)?.id ?? 1
+    const upsertEvent = db.prepare(`INSERT INTO events(title,slug,event_type_id,summary,description,venue,starts_at,image_url,status,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,'published',?,?)
+      ON CONFLICT(slug) DO UPDATE SET
+        title=excluded.title,
+        event_type_id=excluded.event_type_id,
+        summary=excluded.summary,
+        description=excluded.description,
+        venue=excluded.venue,
+        starts_at=excluded.starts_at,
+        image_url=excluded.image_url,
+        status='published',
+        updated_at=excluded.updated_at`)
+    
+    staticEvents.forEach((ev) => {
+      const typeKey = (ev.type || 'workshop').toLowerCase()
+      const slug = ev.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      upsertEvent.run(
+        ev.title,
+        slug,
+        eventTypeId(typeKey),
+        ev.summary || ev.description.slice(0, 200),
+        ev.description,
+        ev.venue || 'DBIT Campus',
+        ev.date.includes('T') ? ev.date : `${ev.date}T10:00:00`,
+        ev.image ? '/' + ev.image.replace(/^\//, '') : '',
+        timestamp,
+        timestamp
+      )
+    })
+
+    // 3. Flagships
+    const staticFlagships = loadJson('static_flagships.json')
+    const upsertFlagship = db.prepare(`INSERT INTO flagships(title,slug,description,image_url,year,status,created_at,updated_at)
+      VALUES(?,?,?,?,2026,'published',?,?)
+      ON CONFLICT(slug) DO UPDATE SET
+        title=excluded.title,
+        description=excluded.description,
+        updated_at=excluded.updated_at`)
+    staticFlagships.forEach((flag) => {
+      const slug = flag.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      upsertFlagship.run(flag.title, slug, flag.description, `/flagships/${flag.badge || slug}.png`, timestamp, timestamp)
+    })
+
+    // 4. Challenges
+    const staticChallenges = loadJson('static_challenges.json')
+    db.exec('DELETE FROM challenges')
+    const insertChallenge = db.prepare(`INSERT INTO challenges(id,title,slug,category,difficulty,points,description,hint,flag_hash,status,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,'published',?,?)`)
+    staticChallenges.forEach((ch) => {
+      const slug = ch.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      const flagHash = createHash('sha256').update(ch.flag).digest('hex')
+      insertChallenge.run(
+        ch.id,
+        ch.title,
+        slug,
+        ch.category,
+        ch.difficulty,
+        ch.points,
+        ch.description,
+        ch.hint || '',
+        flagHash,
+        timestamp,
+        timestamp
+      )
+    })
+
+    // 5. Gallery Folders & Items
+    const staticGallery = loadJson('static_gallery.json')
+    const folderMap = new Map()
+    staticGallery.forEach((item) => {
+      if (!folderMap.has(item.folder)) {
+        let folderRow = db.prepare('SELECT id FROM gallery_folders WHERE name=?').get(item.folder)
+        if (!folderRow) {
+          const res = db.prepare('INSERT INTO gallery_folders(name,parent_id,created_at) VALUES(?,?,?)').run(item.folder, null, timestamp)
+          folderMap.set(item.folder, Number(res.lastInsertRowid))
+        } else {
+          folderMap.set(item.folder, folderRow.id)
+        }
+      }
+    })
+
+    db.exec('DELETE FROM gallery_items')
+    const insertGalleryItem = db.prepare(`INSERT INTO gallery_items(folder_id,image_url,caption,taken_at,published,created_at,updated_at)
+      VALUES(?,?,?,?,1,?,?)`)
+    staticGallery.forEach((item) => {
+      const folderId = folderMap.get(item.folder) || null
+      insertGalleryItem.run(
+        folderId,
+        item.image ? '/' + item.image.replace(/^\//, '') : '',
+        item.caption || item.alt || '',
+        timestamp,
+        timestamp,
+        timestamp
+      )
+    })
+
+    db.prepare('INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)')
+      .run(9, 'import static site data', timestamp)
     db.exec('COMMIT')
   } catch (error) {
     try { db.exec('ROLLBACK') } catch { /* preserve original migration error */ }

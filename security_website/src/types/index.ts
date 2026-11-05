@@ -1,24 +1,41 @@
 export type UserRole = 'admin' | 'core' | 'member' | 'visitor'
-export type EventType = 'workshop' | 'ctf' | 'seminar' | 'inauguration' | 'bootcamp'
+export type EventType = 'workshop' | 'ctf' | 'seminar' | 'inauguration' | 'bootcamp' | 'competition'
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'completed'
+
+export interface EventAttachment {
+  label: string
+  path: string
+  type: string
+}
+
+export interface OutcomeItem {
+  code: string
+  text: string
+}
 
 export interface EventItem {
   id: number
   title: string
   date: string
-  type: EventType
+  dateLabel?: string
+  type: string
   description: string
   tags: string[]
   poster?: string
+  image?: string
   slug?: string
   summary?: string
   venue?: string | null
+  speaker?: string
   starts_at?: string
   ends_at?: string | null
   registration_open_at?: string | null
   registration_close_at?: string | null
   capacity?: number | null
   status?: EventStatus
+  attachments?: EventAttachment[]
+  objectives?: string[]
+  outcomes?: OutcomeItem[]
 }
 
 export interface EventInput {
@@ -89,8 +106,14 @@ export interface Flagship {
   id: number
   title: string
   description: string
-  image: string
-  year: string
+  meta?: string
+  cycle?: string
+  format?: string
+  pillars?: string[]
+  badge?: string
+  status?: string
+  image?: string
+  year?: string
 }
 
 export interface TeamMember {
@@ -98,17 +121,25 @@ export interface TeamMember {
   name: string
   role: string
   image: string
+  department?: string
+  rank?: number
+  bio?: string
   description?: string
+  tenure?: string
   linkedin?: string
   quote?: string
 }
 
 export interface GalleryItem {
   id: number
-  imageUrl: string
-  caption: string
-  event: string
-  date: string
+  image?: string
+  imageUrl?: string
+  alt?: string
+  caption?: string
+  folder?: string
+  folderLabel?: string
+  event?: string
+  date?: string
 }
 
 export interface GalleryPhoto {
@@ -138,9 +169,21 @@ export interface Challenge {
   id: number
   title: string
   category: string
-  difficulty: 'easy' | 'medium' | 'hard'
+  difficulty: string
   points: number
-  solved: boolean
+  solved?: boolean
+  description: string
+  hint?: string
+  flag?: string
+}
+
+export interface AwarenessItem {
+  title: string
+  category: string
+  year: string
+  date: string
+  image: string
+  alt: string
   description: string
 }
 

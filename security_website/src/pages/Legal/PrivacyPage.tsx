@@ -1,49 +1,46 @@
-import SectionHeader from '../../components/common/SectionHeader'
-import DraggableWorkspace from '../../components/layout/DraggableWorkspace'
-
-function PrivacyPage() {
+export default function PrivacyPage() {
   return (
-    <DraggableWorkspace pageKey="privacy">
-      <SectionHeader
-        eyebrow="Compliance & Trust"
-        title="Privacy Policy"
-        subtitle="How Security Club DBIT collects, protects, and manages student and member data."
-      />
+    <div className="page section-shell">
+      <section className="page-hero">
+        <div>
+          <p className="eyebrow">Code of conduct &amp; disclosure</p>
+          <h1>Privacy &amp; Ethics</h1>
+          <p className="hero-lede">
+            Responsible practice. Student privacy. Transparent guidelines for ethical research and defensive cybersecurity.
+          </p>
+        </div>
+      </section>
 
-      <div className="card" style={{ maxWidth: '840px', margin: '0 auto', lineHeight: '1.7' }}>
-        <h3>1. Information We Collect</h3>
-        <p className="muted">
-          Security Club collects student identity and contact information strictly for club operations, membership verification, and event registration:
-        </p>
-        <ul className="plain-list">
-          <li><strong>Student Profile:</strong> Full name, student ID, roll number, academic year, branch, and college email address.</li>
-          <li><strong>Authentication Credentials:</strong> Securely salted cryptographic hashes of passwords (never plaintext).</li>
-          <li><strong>Activity Logs:</strong> CTF challenge submissions, event attendance, and competition leaderboard metrics.</li>
-        </ul>
+      <div className="about-vision-mission" style={{ marginTop: '2rem' }}>
+        <section className="info-panel course-panel">
+          <p className="eyebrow">Code of Ethics</p>
+          <h2>Ethical Hacking &amp; Responsible Disclosure</h2>
+          <ul className="mission-list">
+            <li>
+              All tools, challenge environments, and defensive techniques taught at Security Club DBIT
+              must be practiced only on designated authorized sandboxes.
+            </li>
+            <li>
+              Unauthorized access, network scanning, or testing against institutional systems, student
+              data, or third-party targets without explicit authorization is strictly prohibited.
+            </li>
+            <li>
+              Any discovered vulnerabilities must be responsibly disclosed directly to the respective
+              system owners following industry-standard Coordinated Vulnerability Disclosure (CVD).
+            </li>
+          </ul>
+        </section>
 
-        <h3 style={{ marginTop: '1.5rem' }}>2. How Information Is Used</h3>
-        <p className="muted">
-          Data collected is used exclusively for legitimate club activities:
-        </p>
-        <ul className="plain-list">
-          <li>Reviewing membership applications and verifying active student status.</li>
-          <li>Notifying members of upcoming workshops, bootcamps, and CTF challenges.</li>
-          <li>Maintaining academic audit trails and competition scores.</li>
-        </ul>
-
-        <h3 style={{ marginTop: '1.5rem' }}>3. Data Protection & Security</h3>
-        <p className="muted">
-          We implement industry-standard safeguards including HTTP-only secure session cookies, scrypt password hashing, parameter-bound database operations, and restricted role-based administrative access. Data is never sold or shared with external marketing third parties.
-        </p>
-
-        <h3 style={{ marginTop: '1.5rem' }}>4. Contact & Inquiries</h3>
-        <p className="muted">
-          For data access or deletion requests, contact the faculty coordinator or write to us at{' '}
-          <a href="mailto:securityclubdbit@gmail.com">securityclubdbit@gmail.com</a>.
-        </p>
+        <section className="info-panel course-panel">
+          <p className="eyebrow">Student Privacy</p>
+          <h2>Data Protection</h2>
+          <p>
+            We collect only necessary student identity details for membership administration, event
+            registration, and certification verification. Your data is stored locally or in secure
+            encrypted database instances, and is never shared, marketed, or sold.
+          </p>
+        </section>
       </div>
-    </DraggableWorkspace>
+    </div>
   )
 }
-
-export default PrivacyPage
