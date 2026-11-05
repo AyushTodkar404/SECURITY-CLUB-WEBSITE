@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
@@ -9,12 +9,46 @@ const useTurso = Boolean(
   process.env.TURSO_AUTH_TOKEN
 )
 
-const databasePath = resolve(
-  process.env.DATABASE_PATH ?? './data/security-club.sqlite'
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const bundledDbPath = resolve(__dirname, '../../data/security-club.sqlite')
+
+let databasePath = resolve(
+  process.env.DATABASE_PATH ?? (existsSync(bundledDbPath) ? bundledDbPath : resolve('./data/security-club.sqlite'))
 )
 
 if (!useTurso) {
-  mkdirSync(dirname(databasePath), { recursive: true })
+  // On Vercel / serverless platforms, deployment files are read-only.
+  // Copy SQLite db to /tmp so writes (logins, sessions, applications) succeed.
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    const tmpDb = '/tmp/security-club.sqlite'
+    if (!existsSync(tmpDb)) {
+      const candidates = [
+        bundledDbPath,
+        resolve(__dirname, '../data/security-club.sqlite'),
+        resolve(process.cwd(), 'data/security-club.sqlite'),
+        resolve(process.cwd(), '../data/security-club.sqlite'),
+      ]
+      for (const cand of candidates) {
+        if (existsSync(cand)) {
+          try {
+            copyFileSync(cand, tmpDb)
+            break
+          } catch (e) {
+            console.error('Failed to copy database to /tmp:', e)
+          }
+        }
+      }
+    }
+    if (existsSync(tmpDb)) {
+      databasePath = tmpDb
+    }
+  }
+
+  try {
+    mkdirSync(dirname(databasePath), { recursive: true })
+  } catch {
+    // Read-only filesystem or already exists
+  }
 }
 
 export const db = useTurso
@@ -24,9 +58,13 @@ export const db = useTurso
   : new Database(databasePath)
 
 if (!useTurso) {
-  db.exec('PRAGMA foreign_keys = ON;')
-  db.exec('PRAGMA journal_mode = WAL;')
-  db.exec('PRAGMA busy_timeout = 5000;')
+  try {
+    db.exec('PRAGMA foreign_keys = ON;')
+    db.exec('PRAGMA journal_mode = WAL;')
+    db.exec('PRAGMA busy_timeout = 5000;')
+  } catch (e) {
+    console.warn('SQLite PRAGMA notice:', e.message)
+  }
 }
 
 const hasTable = (name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name))
@@ -700,9 +738,12 @@ function seed() {
   challenge.run('Welcome Challenge', 'welcome-challenge', 'web', 'beginner', 100, 'Find the flag hidden in the club welcome challenge.', sha256('flag{welcome_to_security_club}'), 'published', timestamp, timestamp)
   const testimonial = db.prepare('INSERT OR IGNORE INTO testimonials(name,role_label,quote,published,display_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')
   testimonial.run('Security Club Alumni', 'Alumni', 'The club turns curiosity into practical security skills.', 1, 1, timestamp, timestamp)
-  if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD && !db.prepare('SELECT 1 FROM users WHERE email = ?').get(process.env.ADMIN_EMAIL.trim().toLowerCase())) {
+  const adminEmail = (process.env.ADMIN_EMAIL ?? 'ayushtodkar404@gmail.com').trim().toLowerCase()
+  const adminPassword = process.env.ADMIN_PASSWORD ?? 'Ayush@2005'
+  const adminName = process.env.ADMIN_NAME ?? 'Ayush Todkar'
+  if (!db.prepare('SELECT 1 FROM users WHERE email = ?').get(adminEmail)) {
     db.prepare(`INSERT INTO users(email,password_hash,display_name,role_id,status,email_verified_at,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?)`).run(process.env.ADMIN_EMAIL.trim().toLowerCase(), hashPassword(process.env.ADMIN_PASSWORD), process.env.ADMIN_NAME ?? 'Club Administrator', roleId('admin'), 'active', timestamp, timestamp, timestamp)
+      VALUES(?,?,?,?,?,?,?,?)`).run(adminEmail, hashPassword(adminPassword), adminName, roleId('admin'), 'active', timestamp, timestamp, timestamp)
   }
 }
 
