@@ -8,7 +8,8 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const form = new FormData(e.currentTarget)
+    const formElement = e.currentTarget
+    const form = new FormData(formElement)
     const name = String(form.get('name') || '')
     const email = String(form.get('email') || '')
     const message = String(form.get('message') || '')
@@ -19,7 +20,7 @@ export default function ContactPage() {
     try {
       await submitContact({ name, email, message })
       setSubmitted(true)
-      e.currentTarget.reset()
+      formElement.reset()
     } catch {
       // Fallback: compose mailto/Gmail URL
       const params = new URLSearchParams({

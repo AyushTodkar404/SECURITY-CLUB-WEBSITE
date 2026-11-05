@@ -8,7 +8,8 @@ export default function MembershipPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const form = new FormData(event.currentTarget)
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
     setSubmitting(true)
     setMessage(null)
     setError(null)
@@ -33,7 +34,7 @@ export default function MembershipPage() {
       setMessage(
         `Application #${result.id} submitted successfully! The core team will review your details.`
       )
-      event.currentTarget.reset()
+      formElement.reset()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to submit your application')
     } finally {
