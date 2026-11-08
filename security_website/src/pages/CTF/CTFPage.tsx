@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { getChallenges, submitChallenge } from '../../api/client'
+import { getChallenges, submitChallenge, createChallenge, deleteChallenge } from '../../api/client'
 import { challenges as defaultChallenges, type Challenge } from '../../data/ctf'
+import { useAdmin } from '../../hooks/useAdmin'
 
 const STORAGE_KEY = 'security-club-ctf-solved-v1'
 
 export default function CTFPage() {
+  const isAdmin = useAdmin()
   const [items, setItems] = useState<Challenge[]>(defaultChallenges)
   const [selectedCat, setSelectedCat] = useState('all')
   const [solvedIds, setSolvedIds] = useState<number[]>(() => {
@@ -19,6 +21,18 @@ export default function CTFPage() {
   const [feedback, setFeedback] = useState<Record<number, { success: boolean; message: string }>>({})
   const [flagInputs, setFlagInputs] = useState<Record<number, string>>({})
   const [submitting, setSubmitting] = useState<Record<number, boolean>>({})
+
+  // Admin add modal state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [adminSubmitting, setAdminSubmitting] = useState(false)
+  const [adminError, setAdminError] = useState<string | null>(null)
+  const [formTitle, setFormTitle] = useState('')
+  const [formCategory, setFormCategory] = useState('web')
+  const [formDifficulty, setFormDifficulty] = useState('easy')
+  const [formPoints, setFormPoints] = useState('100')
+  const [formFlag, setFormFlag] = useState('SC{')
+  const [formHint, setFormHint] = useState('')
+  const [formDescription, setFormDescription] = useState('')
 
   useEffect(() => {
     let active = true
@@ -46,6 +60,61 @@ export default function CTFPage() {
       active = false
     }
   }, [])
+
+  const handleAddChallenge = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!formTitle.trim() || !formFlag.trim() || !formDescription.trim()) return
+    setAdminSubmitting(true)
+    setAdminError(null)
+
+    try {
+      const pts = Number(formPoints) || 100
+      const created = await createChallenge({
+        title: formTitle.trim(),
+        category: formCategory.toLowerCase(),
+        difficulty: formDifficulty.toLowerCase(),
+        points: pts,
+        flag: formFlag.trim(),
+        hint: formHint.trim() || undefined,
+        description: formDescription.trim(),
+        status: 'published',
+      })
+
+      const newChallenge: Challenge = {
+        id: created.id || Date.now(),
+        title: created.title || formTitle.trim(),
+        category: formCategory.toLowerCase(),
+        difficulty: formDifficulty.toLowerCase() as any,
+        points: pts,
+        description: formDescription.trim(),
+        hint: formHint.trim() || undefined,
+        flag: formFlag.trim(),
+      }
+
+      setItems((prev) => [newChallenge, ...prev])
+      setShowAddModal(false)
+      setFormTitle('')
+      setFormFlag('SC{')
+      setFormHint('')
+      setFormDescription('')
+    } catch (err) {
+      setAdminError(err instanceof Error ? err.message : 'Failed to create challenge')
+    } finally {
+      setAdminSubmitting(false)
+    }
+  }
+
+  const handleDeleteChallenge = async (challenge: Challenge) => {
+    if (!window.confirm(`Delete challenge "${challenge.title}"?`)) return
+    try {
+      if (challenge.id) {
+        await deleteChallenge(challenge.id)
+      }
+      setItems((prev) => prev.filter((c) => c.id !== challenge.id))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete challenge')
+    }
+  }
 
   const categories = ['all', ...Array.from(new Set(items.map((c) => c.category)))]
 
@@ -126,6 +195,156 @@ export default function CTFPage() {
           </p>
         </div>
       </section>
+
+      {isAdmin && (
+        <div className="admin-action-bar">
+          <div className="admin-badge-group">
+            <span className="admin-badge-tag">Admin Mode</span>
+            <p>You have permission to author new challenges and archive existing lab rooms.</p>
+          </div>
+          <button
+            type="button"
+            className="admin-btn-add"
+            onClick={() => {
+              setAdminError(null)
+              setShowAddModal(true)
+            }}
+          >
+            + Add Challenge
+          </button>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className="admin-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="admin-modal-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h3>Author CTF Challenge</h3>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => setShowAddModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            {adminError && <div className="admin-form-error">{adminError}</div>}
+
+            <form onSubmit={handleAddChallenge} className="admin-form-grid">
+              <div className="admin-field-group">
+                <label htmlFor="ctf-title">Challenge Title *</label>
+                <input
+                  id="ctf-title"
+                  type="text"
+                  required
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="e.g. Header Analysis: Token Inspect"
+                />
+              </div>
+
+              <div className="admin-form-row">
+                <div className="admin-field-group">
+                  <label htmlFor="ctf-category">Category *</label>
+                  <select
+                    id="ctf-category"
+                    value={formCategory}
+                    onChange={(e) => setFormCategory(e.target.value)}
+                  >
+                    <option value="recon">Reconnaissance</option>
+                    <option value="crypto">Cryptography</option>
+                    <option value="web">Web Security</option>
+                    <option value="forensics">Forensics</option>
+                    <option value="network">Network Inspection</option>
+                    <option value="misc">Miscellaneous</option>
+                  </select>
+                </div>
+                <div className="admin-field-group">
+                  <label htmlFor="ctf-diff">Difficulty *</label>
+                  <select
+                    id="ctf-diff"
+                    value={formDifficulty}
+                    onChange={(e) => setFormDifficulty(e.target.value)}
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="admin-form-row">
+                <div className="admin-field-group">
+                  <label htmlFor="ctf-points">Points *</label>
+                  <input
+                    id="ctf-points"
+                    type="number"
+                    required
+                    value={formPoints}
+                    onChange={(e) => setFormPoints(e.target.value)}
+                    min="10"
+                    max="1000"
+                    placeholder="100"
+                  />
+                </div>
+                <div className="admin-field-group">
+                  <label htmlFor="ctf-flag">Flag Token (SC{`{...}`}) *</label>
+                  <input
+                    id="ctf-flag"
+                    type="text"
+                    required
+                    value={formFlag}
+                    onChange={(e) => setFormFlag(e.target.value)}
+                    placeholder="SC{super_secret_flag}"
+                  />
+                </div>
+              </div>
+
+              <div className="admin-field-group">
+                <label htmlFor="ctf-hint">Hint (Optional)</label>
+                <input
+                  id="ctf-hint"
+                  type="text"
+                  value={formHint}
+                  onChange={(e) => setFormHint(e.target.value)}
+                  placeholder="e.g. Inspect the response headers..."
+                />
+              </div>
+
+              <div className="admin-field-group">
+                <label htmlFor="ctf-desc">Description &amp; Problem Brief *</label>
+                <textarea
+                  id="ctf-desc"
+                  rows={4}
+                  required
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Provide context, mission objectives, and target parameters..."
+                />
+              </div>
+
+              <div className="admin-form-footer">
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => setShowAddModal(false)}
+                  disabled={adminSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={adminSubmitting}
+                >
+                  {adminSubmitting ? 'Publishing...' : 'Publish Challenge'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="ctf-browser">
         <div className="ctf-terminal-hud">
@@ -257,6 +476,19 @@ export default function CTFPage() {
                       </div>
                     )}
                   </form>
+
+                  {isAdmin && (
+                    <div className="admin-card-actions">
+                      <button
+                        type="button"
+                        className="admin-delete-btn"
+                        onClick={() => handleDeleteChallenge(c)}
+                        title={`Delete ${c.title}`}
+                      >
+                        ✕ Delete Challenge
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
             )

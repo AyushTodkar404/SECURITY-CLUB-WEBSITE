@@ -12,6 +12,8 @@ import type {
   UserRole,
   CorePosition,
   Challenge,
+  AwarenessItem,
+  Testimonial,
 } from '../types'
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? '/api'
@@ -169,16 +171,24 @@ export async function deleteGalleryFolder(folderId: number): Promise<void> {
   await request(`/gallery/folders/${folderId}`, { method: 'DELETE' })
 }
 
-export async function createGalleryPhoto(folderId: number, imageUrl: string, caption: string): Promise<GalleryPhoto> {
+export async function createGalleryPhoto(
+  folderIdOrInput: number | { imageUrl: string; caption?: string; folderId?: number },
+  imageUrl?: string,
+  caption?: string,
+): Promise<GalleryPhoto> {
+  const fId = typeof folderIdOrInput === 'number' ? folderIdOrInput : (folderIdOrInput.folderId || 1)
+  const img = typeof folderIdOrInput === 'object' ? folderIdOrInput.imageUrl : (imageUrl || '')
+  const cap = typeof folderIdOrInput === 'object' ? (folderIdOrInput.caption || '') : (caption || '')
+
   const created = await request<{ id: number; image_url: string; caption: string | null; taken_at: string | null }>(
     '/gallery',
-    { method: 'POST', ...jsonBody({ folderId, imageUrl, caption }) },
+    { method: 'POST', ...jsonBody({ folderId: fId, imageUrl: img, caption: cap }) },
   )
   return {
     id: String(created.id),
     imageUrl: created.image_url,
-    name: created.caption ?? caption,
-    caption: created.caption ?? caption,
+    name: created.caption ?? cap,
+    caption: created.caption ?? cap,
     event: '',
     date: created.taken_at ?? '',
   }
@@ -188,14 +198,17 @@ export async function deleteGalleryPhoto(photoId: number): Promise<void> {
   await request(`/gallery/${photoId}`, { method: 'DELETE' })
 }
 
-export async function createTeamMember(member: Omit<TeamMember, 'id'>): Promise<TeamMember> {
+export async function createTeamMember(member: Partial<TeamMember> & { name: string; role: string }): Promise<TeamMember> {
   return request<TeamMember>('/team', {
     method: 'POST',
     ...jsonBody({
       nameOverride: member.name,
       roleTitle: member.role,
-      imageUrl: member.image,
-      description: member.description,
+      imageUrl: member.image || '/assets/team/placeholder.svg',
+      description: member.description || member.bio || '',
+      department: member.department || 'technical',
+      tenure: member.tenure || '2026-27',
+      linkedinUrl: member.linkedin || '',
     }),
   })
 }
@@ -208,8 +221,15 @@ export async function getManagedEvents(): Promise<EventItem[]> {
   return request<EventItem[]>('/events/manage')
 }
 
-export async function createEvent(input: EventInput): Promise<EventItem> {
-  return request<EventItem>('/events', { method: 'POST', ...jsonBody(input) })
+export async function createEvent(input: EventInput & { poster?: string; image?: string; imageUrl?: string }): Promise<EventItem> {
+  return request<EventItem>('/events', {
+    method: 'POST',
+    ...jsonBody({
+      ...input,
+      imageUrl: input.poster || input.image || input.imageUrl,
+      status: input.status || 'published',
+    }),
+  })
 }
 
 export async function updateEvent(id: number, input: Partial<EventInput>): Promise<EventItem> {
@@ -436,3 +456,37 @@ export async function getDashboard(): Promise<unknown> {
 export async function getGallery(): Promise<{ id: number; image_url: string; caption: string }[]> {
   return request('/gallery')
 }
+
+export async function getAwareness(): Promise<AwarenessItem[]> {
+  return request<AwarenessItem[]>('/awareness')
+}
+
+export async function getTestimonials(): Promise<Testimonial[]> {
+  return request<Testimonial[]>('/testimonials')
+}
+
+export interface CreateChallengeInput {
+  title: string
+  category: string
+  difficulty: string
+  points: number
+  description: string
+  flag: string
+  hint?: string
+  status?: 'draft' | 'published' | 'archived'
+}
+
+export async function createChallenge(input: CreateChallengeInput): Promise<Challenge> {
+  return request<Challenge>('/challenges', {
+    method: 'POST',
+    ...jsonBody(input),
+  })
+}
+
+export async function deleteChallenge(id: number): Promise<void> {
+  await request(`/challenges/${id}`, { method: 'DELETE' })
+}
+
+export const deleteEvent = cancelEvent
+export const deleteFlagship = archiveFlagship
+export const deleteTeamMember = archiveTeamMember

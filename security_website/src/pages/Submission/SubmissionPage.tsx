@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { submitContact } from '../../api/client'
 
 export default function SubmissionPage() {
   const [submitted, setSubmitted] = useState(false)
@@ -22,6 +23,15 @@ Year: ${year}
 Division: ${division}
 Area of Interest: ${interests}
 Sent via Security Club DBIT Website Submission Form`
+
+    // Asynchronously record submission to backend contact messages table
+    submitContact({
+      name,
+      email,
+      message: `[Student Interest Submission]\nPhone: ${phone}\nYear: ${year}\nDivision: ${division}\nInterests: ${interests}`,
+    }).catch(() => {
+      // Backend log attempt; continue to compose URL
+    })
 
     const params = new URLSearchParams({
       view: 'cm',

@@ -1,11 +1,21 @@
-import { useEffect, useState } from 'react'
-import { getGallery } from '../../api/client'
+import { useEffect, useState, type FormEvent } from 'react'
+import { getGallery, createGalleryPhoto, deleteGalleryPhoto } from '../../api/client'
 import { gallery as defaultGallery, type GalleryItem } from '../../data/gallery'
+import { useAdmin } from '../../hooks/useAdmin'
 
 export default function GalleryPage() {
+  const isAdmin = useAdmin()
   const [items, setItems] = useState<GalleryItem[]>(defaultGallery)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [activePhoto, setActivePhoto] = useState<GalleryItem | null>(null)
+
+  // Admin add modal state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [adminError, setAdminError] = useState<string | null>(null)
+  const [formImage, setFormImage] = useState('')
+  const [formCaption, setFormCaption] = useState('')
+  const [formFolder, setFormFolder] = useState('2026/DSCI 2 DAY BOOTCAMP 2026')
 
   useEffect(() => {
     let active = true
@@ -37,6 +47,55 @@ export default function GalleryPage() {
     }
   }, [])
 
+  const handleAddPhoto = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!formImage.trim() || !formCaption.trim()) return
+    setSubmitting(true)
+    setAdminError(null)
+
+    try {
+      const created = await createGalleryPhoto({
+        imageUrl: formImage.trim(),
+        caption: formCaption.trim(),
+      })
+
+      const newPhoto: GalleryItem = {
+        id: Number(created.id) || Date.now(),
+        image: formImage.trim(),
+        caption: formCaption.trim(),
+        alt: formCaption.trim(),
+        folder: formFolder || '2026/DSCI 2 DAY BOOTCAMP 2026',
+        folderLabel: 'DSCI BOOTCAMP',
+      }
+
+      setItems((prev) => [newPhoto, ...prev])
+      setShowAddModal(false)
+      setFormImage('')
+      setFormCaption('')
+    } catch (err) {
+      setAdminError(err instanceof Error ? err.message : 'Failed to upload photo')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeletePhoto = async (item: GalleryItem) => {
+    if (!window.confirm('Delete this photo from the community gallery?')) return
+    try {
+      if (item.id) {
+        await deleteGalleryPhoto(item.id)
+      }
+      setItems((prev) =>
+        prev.filter((g) => (g.id && item.id ? g.id !== item.id : g.image !== item.image))
+      )
+      if (activePhoto?.image === item.image) {
+        setActivePhoto(null)
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete photo')
+    }
+  }
+
   const folders = Array.from(new Set(items.map((i) => i.folder))).sort()
 
   const filteredItems = selectedFolder
@@ -54,6 +113,106 @@ export default function GalleryPage() {
           </p>
         </div>
       </section>
+
+      {isAdmin && (
+        <div className="admin-action-bar">
+          <div className="admin-badge-group">
+            <span className="admin-badge-tag">Admin Mode</span>
+            <p>You have permission to add new media records or remove photos from the gallery.</p>
+          </div>
+          <button
+            type="button"
+            className="admin-btn-add"
+            onClick={() => {
+              setAdminError(null)
+              setShowAddModal(true)
+            }}
+          >
+            + Add Gallery Image
+          </button>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className="admin-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="admin-modal-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h3>Add Gallery Photo</h3>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => setShowAddModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            {adminError && <div className="admin-form-error">{adminError}</div>}
+
+            <form onSubmit={handleAddPhoto} className="admin-form-grid">
+              <div className="admin-field-group">
+                <label htmlFor="gallery-img">Image URL or Asset Path *</label>
+                <input
+                  id="gallery-img"
+                  type="text"
+                  required
+                  value={formImage}
+                  onChange={(e) => setFormImage(e.target.value)}
+                  placeholder="/gallery/.../photo.jpg or https://..."
+                />
+              </div>
+
+              <div className="admin-field-group">
+                <label htmlFor="gallery-caption">Caption &amp; Alt Description *</label>
+                <input
+                  id="gallery-caption"
+                  type="text"
+                  required
+                  value={formCaption}
+                  onChange={(e) => setFormCaption(e.target.value)}
+                  placeholder="e.g. Participants analyzing network packets during Lab session 2"
+                />
+              </div>
+
+              <div className="admin-field-group">
+                <label htmlFor="gallery-folder">Folder Category</label>
+                <select
+                  id="gallery-folder"
+                  value={formFolder}
+                  onChange={(e) => setFormFolder(e.target.value)}
+                >
+                  {folders.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                  <option value="2026/DSCI 2 DAY BOOTCAMP 2026">
+                    2026 / DSCI 2 DAY BOOTCAMP 2026
+                  </option>
+                </select>
+              </div>
+
+              <div className="admin-form-footer">
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => setShowAddModal(false)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Uploading...' : 'Save Image'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="gallery-browser">
         <div className="gallery-level">
@@ -88,7 +247,7 @@ export default function GalleryPage() {
         <div className="gallery-grid">
           {filteredItems.map((item) => (
             <figure
-              key={item.id + item.image}
+              key={item.id ? `${item.id}-${item.image}` : item.image}
               className="gallery-item"
               data-gallery-item
               data-gallery-folder={item.folder}
@@ -106,7 +265,24 @@ export default function GalleryPage() {
                   loading="lazy"
                 />
               </button>
-              <figcaption>{item.caption}</figcaption>
+              <figcaption>
+                {item.caption}
+                {isAdmin && (
+                  <div className="admin-card-actions" style={{ marginTop: '0.4rem' }}>
+                    <button
+                      type="button"
+                      className="admin-delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeletePhoto(item)
+                      }}
+                      title="Delete image"
+                    >
+                      ✕ Delete
+                    </button>
+                  </div>
+                )}
+              </figcaption>
             </figure>
           ))}
         </div>
@@ -160,6 +336,18 @@ export default function GalleryPage() {
               >
                 {activePhoto.caption}
               </p>
+
+              {isAdmin && (
+                <div style={{ marginTop: '1rem' }}>
+                  <button
+                    type="button"
+                    className="admin-delete-btn"
+                    onClick={() => handleDeletePhoto(activePhoto)}
+                  >
+                    ✕ Delete Image from Gallery
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

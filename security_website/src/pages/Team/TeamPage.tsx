@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { getTeam } from '../../api/client'
+import { useEffect, useState, type FormEvent } from 'react'
+import { getTeam, createTeamMember, deleteTeamMember } from '../../api/client'
 import { team as defaultTeam, type TeamMember } from '../../data/team'
+import { useAdmin } from '../../hooks/useAdmin'
 
 function departmentOf(role: string): string {
   const r = String(role || '').toLowerCase()
@@ -13,9 +14,22 @@ function departmentOf(role: string): string {
 }
 
 export default function TeamPage() {
+  const isAdmin = useAdmin()
   const [members, setMembers] = useState<TeamMember[]>(defaultTeam)
   const [selectedYear, setSelectedYear] = useState('2026-27')
   const [selectedDept, setSelectedDept] = useState('all')
+
+  // Admin add modal state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [adminError, setAdminError] = useState<string | null>(null)
+  const [formName, setFormName] = useState('')
+  const [formRole, setFormRole] = useState('')
+  const [formDept, setFormDept] = useState('technical')
+  const [formTenure, setFormTenure] = useState('2026-27')
+  const [formImage, setFormImage] = useState('')
+  const [formLinkedin, setFormLinkedin] = useState('')
+  const [formBio, setFormBio] = useState('')
 
   useEffect(() => {
     let active = true
@@ -46,6 +60,62 @@ export default function TeamPage() {
       active = false
     }
   }, [])
+
+  const handleAddMember = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!formName.trim() || !formRole.trim()) return
+    setSubmitting(true)
+    setAdminError(null)
+    try {
+      const created = await createTeamMember({
+        name: formName.trim(),
+        role: formRole.trim(),
+        department: formDept,
+        tenure: formTenure,
+        image: formImage.trim() || '/assets/team/placeholder.svg',
+        linkedin: formLinkedin.trim() || undefined,
+        description: formBio.trim() || undefined,
+      })
+      setMembers((prev) => [
+        {
+          id: created.id || Date.now(),
+          name: created.name || formName.trim(),
+          role: created.role || formRole.trim(),
+          department: formDept,
+          tenure: formTenure,
+          image: formImage.trim() || '/assets/team/placeholder.svg',
+          linkedin: formLinkedin.trim() || undefined,
+          bio: formBio.trim() || undefined,
+          description: formBio.trim() || undefined,
+        },
+        ...prev,
+      ])
+      setShowAddModal(false)
+      setFormName('')
+      setFormRole('')
+      setFormImage('')
+      setFormLinkedin('')
+      setFormBio('')
+    } catch (err) {
+      setAdminError(err instanceof Error ? err.message : 'Failed to add team member')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteMember = async (item: TeamMember) => {
+    if (!window.confirm(`Delete ${item.name} from the team roster?`)) return
+    try {
+      if (item.id) {
+        await deleteTeamMember(item.id)
+      }
+      setMembers((prev) =>
+        prev.filter((m) => (m.id && item.id ? m.id !== item.id : m.name !== item.name))
+      )
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete member')
+    }
+  }
 
   const mentors = members.filter(
     (m) =>
@@ -86,7 +156,7 @@ export default function TeamPage() {
 
     return (
       <article
-        key={item.name}
+        key={item.id ? `${item.id}-${item.name}` : item.name}
         className={`card team-card ${isLeader ? 'is-leadership' : ''}`}
       >
         <div className="team-card-header">
@@ -150,6 +220,19 @@ export default function TeamPage() {
               </span>
             </a>
           ) : null}
+
+          {isAdmin && (
+            <div className="admin-card-actions">
+              <button
+                type="button"
+                className="admin-delete-btn"
+                onClick={() => handleDeleteMember(item)}
+                title={`Delete ${item.name}`}
+              >
+                ✕ Delete Member
+              </button>
+            </div>
+          )}
         </div>
       </article>
     )
@@ -167,6 +250,153 @@ export default function TeamPage() {
           </p>
         </div>
       </section>
+
+      {isAdmin && (
+        <div className="admin-action-bar">
+          <div className="admin-badge-group">
+            <span className="admin-badge-tag">Admin Mode</span>
+            <p>You have permission to add or delete team members.</p>
+          </div>
+          <button
+            type="button"
+            className="admin-btn-add"
+            onClick={() => {
+              setAdminError(null)
+              setShowAddModal(true)
+            }}
+          >
+            + Add Team Member
+          </button>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className="admin-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="admin-modal-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h3>Add Team Member</h3>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => setShowAddModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            {adminError && <div className="admin-form-error">{adminError}</div>}
+
+            <form onSubmit={handleAddMember} className="admin-form-grid">
+              <div className="admin-form-row">
+                <div className="admin-field-group">
+                  <label htmlFor="team-name">Full Name *</label>
+                  <input
+                    id="team-name"
+                    type="text"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="e.g. Alex Rivera"
+                  />
+                </div>
+                <div className="admin-field-group">
+                  <label htmlFor="team-role">Role Title *</label>
+                  <input
+                    id="team-role"
+                    type="text"
+                    required
+                    value={formRole}
+                    onChange={(e) => setFormRole(e.target.value)}
+                    placeholder="e.g. Security Researcher"
+                  />
+                </div>
+              </div>
+
+              <div className="admin-form-row">
+                <div className="admin-field-group">
+                  <label htmlFor="team-dept">Department</label>
+                  <select
+                    id="team-dept"
+                    value={formDept}
+                    onChange={(e) => setFormDept(e.target.value)}
+                  >
+                    <option value="leadership">Leadership</option>
+                    <option value="technical">Technical</option>
+                    <option value="research">Research</option>
+                    <option value="events">Events &amp; PR</option>
+                    <option value="design">Design &amp; Editorial</option>
+                    <option value="faculty">Faculty Guidance</option>
+                    <option value="alumni">Alumni</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="admin-field-group">
+                  <label htmlFor="team-tenure">Tenure</label>
+                  <input
+                    id="team-tenure"
+                    type="text"
+                    value={formTenure}
+                    onChange={(e) => setFormTenure(e.target.value)}
+                    placeholder="2026-27 or Mentor"
+                  />
+                </div>
+              </div>
+
+              <div className="admin-form-row">
+                <div className="admin-field-group">
+                  <label htmlFor="team-image">Image URL</label>
+                  <input
+                    id="team-image"
+                    type="text"
+                    value={formImage}
+                    onChange={(e) => setFormImage(e.target.value)}
+                    placeholder="/team/member.webp or https://..."
+                  />
+                </div>
+                <div className="admin-field-group">
+                  <label htmlFor="team-linkedin">LinkedIn URL</label>
+                  <input
+                    id="team-linkedin"
+                    type="url"
+                    value={formLinkedin}
+                    onChange={(e) => setFormLinkedin(e.target.value)}
+                    placeholder="https://linkedin.com/in/..."
+                  />
+                </div>
+              </div>
+
+              <div className="admin-field-group">
+                <label htmlFor="team-bio">Bio / Description</label>
+                <textarea
+                  id="team-bio"
+                  rows={3}
+                  value={formBio}
+                  onChange={(e) => setFormBio(e.target.value)}
+                  placeholder="Focus areas, contributions, or achievements..."
+                />
+              </div>
+
+              <div className="admin-form-footer">
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => setShowAddModal(false)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Adding...' : 'Add Member'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <section className="team-section" aria-labelledby="team-mentors-heading">
         <div className="team-section-heading">

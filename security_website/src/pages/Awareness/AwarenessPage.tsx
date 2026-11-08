@@ -1,14 +1,43 @@
-import { useState } from 'react'
-import { awareness, type AwarenessItem } from '../../data/awareness'
+import { useEffect, useState } from 'react'
+import { getAwareness } from '../../api/client'
+import { awareness as defaultAwareness, type AwarenessItem } from '../../data/awareness'
 
 export default function AwarenessPage() {
+  const [items, setItems] = useState<AwarenessItem[]>(defaultAwareness)
   const [selectedYear, setSelectedYear] = useState('2026-27')
   const [selectedCat, setSelectedCat] = useState('all')
   const [activeLightboxItem, setActiveLightboxItem] = useState<AwarenessItem | null>(null)
 
-  const years = Array.from(new Set(awareness.map((a) => a.year || '2026-27')))
+  useEffect(() => {
+    let active = true
+    getAwareness()
+      .then((data) => {
+        if (!active) return
+        if (data && data.length > 0) {
+          const merged = data.map((apiItem) => {
+            const fallback = defaultAwareness.find(
+              (a) => a.title.toLowerCase() === apiItem.title.toLowerCase()
+            )
+            return {
+              ...fallback,
+              ...apiItem,
+              image: apiItem.image || fallback?.image || '',
+            }
+          })
+          setItems(merged)
+        }
+      })
+      .catch(() => {
+        // Fallback already set
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
-  const filteredItems = awareness.filter((item) => {
+  const years = Array.from(new Set(items.map((a) => a.year || '2026-27')))
+
+  const filteredItems = items.filter((item) => {
     const matchesYear = !item.year || item.year === selectedYear
     const matchesCat =
       selectedCat === 'all' || item.category.toLowerCase().includes(selectedCat.toLowerCase())

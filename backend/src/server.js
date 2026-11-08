@@ -236,8 +236,11 @@ function eventInput(body, partial = false) {
   }
   if (!partial || body.capacity !== undefined) result.capacity = integer(body, 'capacity', { required: false, min: 1, max: 1_000_000 })
   if (!partial || body.status !== undefined) {
-    result.status = body.status ?? 'draft'
+    result.status = body.status ?? 'published'
     if (!['draft', 'published', 'cancelled', 'completed'].includes(result.status)) throw fail(400, 'Invalid event status')
+  }
+  if (!partial || body.imageUrl !== undefined || body.image_url !== undefined || body.poster !== undefined) {
+    result.image_url = value(body, 'imageUrl', { required: false, max: 1_800_000 }) ?? value(body, 'image_url', { required: false, max: 1_800_000 }) ?? value(body, 'poster', { required: false, max: 1_800_000 }) ?? null
   }
   if (!partial || body.type !== undefined || body.event_type !== undefined) {
     result.type = value(body, body.type !== undefined ? 'type' : 'event_type', { max: 40 })
@@ -382,8 +385,8 @@ app.post('/api/events', requireAuth, (request, response, next) => {
     const eventId = transaction(() => {
       const timestamp = now()
       const typeId = db.prepare('SELECT id FROM event_types WHERE key=?').get(input.type).id
-      const result = db.prepare(`INSERT INTO events(title,slug,event_type_id,summary,description,venue,starts_at,ends_at,registration_open_at,registration_close_at,capacity,status,created_by,updated_by,created_at,updated_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(input.title, slug, typeId, input.summary, input.description, input.venue, input.starts_at, input.ends_at, input.registration_open_at, input.registration_close_at, input.capacity, input.status, request.user.id, request.user.id, timestamp, timestamp)
+      const result = db.prepare(`INSERT INTO events(title,slug,event_type_id,summary,description,venue,starts_at,ends_at,registration_open_at,registration_close_at,capacity,status,image_url,created_by,updated_by,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(input.title, slug, typeId, input.summary, input.description, input.venue, input.starts_at, input.ends_at, input.registration_open_at, input.registration_close_at, input.capacity, input.status, input.image_url ?? null, request.user.id, request.user.id, timestamp, timestamp)
       const id = Number(result.lastInsertRowid)
       saveTags(id, input.tags)
       if (request.user.id) db.prepare('INSERT OR IGNORE INTO event_heads(event_id,user_id,assigned_by,assigned_at) VALUES(?,?,?,?)').run(id, request.user.id, request.user.id, timestamp)
@@ -468,6 +471,7 @@ app.delete('/api/events/:id/registrations', requireAuth, requireMember, (request
   } catch (error) { next(error) }
 })
 
+app.get('/api/awareness', (_request, response, next) => { try { send(response, db.prepare("SELECT id,title,category,year,date,image_url,alt,description FROM awareness_items WHERE published=1 ORDER BY id").all().map((item) => ({ ...item, image: item.image_url }))) } catch (error) { next(error) } })
 app.get('/api/flagships', (_request, response, next) => { try { send(response, db.prepare("SELECT * FROM flagships WHERE status='published' ORDER BY year DESC,id").all()) } catch (error) { next(error) } })
 app.get('/api/gallery', (_request, response, next) => { try { send(response, db.prepare(`SELECT g.id,g.folder_id,g.image_url,g.caption,g.taken_at,e.title AS event FROM gallery_items g LEFT JOIN events e ON e.id=g.event_id WHERE g.published=1 ORDER BY g.taken_at DESC,g.id DESC`).all()) } catch (error) { next(error) } })
 app.get('/api/gallery/workspace', (_request, response, next) => {
@@ -516,13 +520,15 @@ app.delete('/api/gallery/folders/:id', requireAuth, requirePermission('gallery.m
 app.post('/api/gallery', requireAuth, requirePermission('gallery.manage'), (request, response, next) => {
   try {
     const eventId = integer(request.body, 'eventId', { required: false, min: 1 })
-    const folderId = integer(request.body, 'folderId', { min: 1 })
+    let folderId = integer(request.body, 'folderId', { required: false, min: 1 })
+    if (!folderId || !db.prepare('SELECT 1 FROM gallery_folders WHERE id=?').get(folderId)) {
+      folderId = db.prepare('SELECT id FROM gallery_folders ORDER BY id LIMIT 1').get()?.id || 1
+    }
     const imageUrl = value(request.body, 'imageUrl', { required: false, max: 1_800_000 }) ?? value(request.body, 'image_url', { required: false, max: 1_800_000 })
-    const caption = value(request.body, 'caption', { required: false, max: 500 })
-    const takenAt = iso(request.body, 'takenAt', false) ?? iso(request.body, 'taken_at', false)
+    const caption = value(request.body, 'caption', { required: false, max: 500 }) ?? ''
+    const takenAt = iso(request.body, 'takenAt', false) ?? iso(request.body, 'taken_at', false) ?? now()
     const published = request.body?.published !== undefined ? Boolean(request.body.published) : true
     if (!imageUrl) throw fail(400, 'imageUrl is required')
-    if (!db.prepare('SELECT 1 FROM gallery_folders WHERE id=?').get(folderId)) throw fail(404, 'Gallery folder not found')
     if (eventId && !db.prepare('SELECT 1 FROM events WHERE id=?').get(eventId)) throw fail(404, 'Event not found')
     const timestamp = now();
     const result = db.prepare(`INSERT INTO gallery_items(event_id,folder_id,image_url,caption,taken_at,published,created_by,created_at,updated_at)
@@ -657,18 +663,19 @@ app.post('/api/team', requireAuth, requirePermission('team.manage'), (request, r
     const nameOverride = value(request.body, 'nameOverride', { required: false, max: 160 }) ?? value(request.body, 'name_override', { required: false, max: 160 })
     if (!nameOverride) throw fail(400, 'nameOverride is required')
     const roleTitle = value(request.body, 'roleTitle', { max: 160 }) ?? value(request.body, 'role_title', { max: 160 })
-    const imageUrl = value(request.body, 'imageUrl', { required: false, max: 1_800_000 }) ?? value(request.body, 'image_url', { required: false, max: 1_800_000 })
-    if (!imageUrl) throw fail(400, 'imageUrl is required')
+    const imageUrl = value(request.body, 'imageUrl', { required: false, max: 1_800_000 }) ?? value(request.body, 'image_url', { required: false, max: 1_800_000 }) ?? '/assets/team/placeholder.svg'
     const description = value(request.body, 'description', { required: false, max: 2000 })
+    const department = value(request.body, 'department', { required: false, max: 80 }) ?? 'technical'
+    const tenure = value(request.body, 'tenure', { required: false, max: 80 }) ?? '2026-27'
     const linkedinUrl = value(request.body, 'linkedinUrl', { required: false, max: 500 }) ?? value(request.body, 'linkedin_url', { required: false, max: 500 })
     const quote = value(request.body, 'quote', { required: false, max: 2000 })
     const displayOrder = integer(request.body, 'displayOrder', { required: false, min: 0, max: 1_000_000 }) ?? 0
     const published = request.body?.published !== undefined ? Boolean(request.body.published) : true
     if (userId && !db.prepare('SELECT 1 FROM users WHERE id=?').get(userId)) throw fail(404, 'User not found')
-    const result = db.prepare(`INSERT INTO team_profiles(user_id,name_override,role_title,image_url,description,linkedin_url,quote,display_order,published)
-      VALUES(?,?,?,?,?,?,?,?,?)`).run(userId, nameOverride, roleTitle, imageUrl, description ?? '', linkedinUrl, quote, displayOrder, published ? 1 : 0)
+    const result = db.prepare(`INSERT INTO team_profiles(user_id,name_override,role_title,image_url,description,department,tenure,linkedin_url,quote,display_order,published)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(userId, nameOverride, roleTitle, imageUrl, description ?? '', department, tenure, linkedinUrl, quote, displayOrder, published ? 1 : 0)
     audit(request, 'create', 'team_profile', Number(result.lastInsertRowid), null, { id: Number(result.lastInsertRowid) })
-    send(response, { id: Number(result.lastInsertRowid), name: nameOverride, role: roleTitle, image: imageUrl, description: description ?? '', display_order: displayOrder }, 201)
+    send(response, { id: Number(result.lastInsertRowid), name: nameOverride, role: roleTitle, image: imageUrl, description: description ?? '', department, tenure, linkedin: linkedinUrl, display_order: displayOrder }, 201)
   } catch (error) { next(error) }
 })
 app.patch('/api/team/:id', requireAuth, requirePermission('team.manage'), (request, response, next) => {
@@ -718,11 +725,12 @@ app.post('/api/challenges', requireAuth, requirePermission('challenges.manage'),
     const points = integer(request.body, 'points', { min: 0, max: 1000000 })
     const description = value(request.body, 'description', { max: 5000 })
     const flag = value(request.body, 'flag', { max: 500 })
+    const hint = value(request.body, 'hint', { required: false, max: 2000 }) ?? ''
     const status = value(request.body, 'status', { required: false, max: 20 }) ?? 'published'
     if (!['draft', 'published', 'archived'].includes(status)) throw fail(400, 'Invalid challenge status')
     const timestamp = now();
-    const result = db.prepare(`INSERT INTO challenges(title,slug,category,difficulty,points,description,flag_hash,status,created_by,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(title, slug, category, difficulty, points, description, sha256(flag), status, request.user.id, timestamp, timestamp)
+    const result = db.prepare(`INSERT INTO challenges(title,slug,category,difficulty,points,description,hint,flag_hash,status,created_by,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(title, slug, category, difficulty, points, description, hint, sha256(flag), status, request.user.id, timestamp, timestamp)
     audit(request, 'create', 'challenge', Number(result.lastInsertRowid), null, { id: Number(result.lastInsertRowid) })
     send(response, { id: Number(result.lastInsertRowid), title, slug, category, difficulty, points, description, status }, 201)
   } catch (error) { next(error) }
@@ -753,7 +761,7 @@ app.delete('/api/challenges/:id', requireAuth, requirePermission('challenges.man
     const id = integer({ id: request.params.id }, 'id', { min: 1 })
     const before = db.prepare('SELECT * FROM challenges WHERE id=?').get(id)
     if (!before) throw fail(404, 'Challenge not found')
-    db.prepare('UPDATE challenges SET status="archived",updated_at=? WHERE id=?').run(now(), id)
+    db.prepare("UPDATE challenges SET status='archived',updated_at=? WHERE id=?").run(now(), id)
     audit(request, 'archive', 'challenge', id, before, db.prepare('SELECT * FROM challenges WHERE id=?').get(id))
     send(response, { ok: true })
   } catch (error) { next(error) }

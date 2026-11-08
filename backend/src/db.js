@@ -12,9 +12,14 @@ const useTurso = Boolean(
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const bundledDbPath = resolve(__dirname, '../../data/security-club.sqlite')
 
-let databasePath = resolve(
-  process.env.DATABASE_PATH ?? (existsSync(bundledDbPath) ? bundledDbPath : resolve('./data/security-club.sqlite'))
-)
+let databasePath
+if (process.env.DATABASE_PATH) {
+  const fromCwd = resolve(process.cwd(), process.env.DATABASE_PATH)
+  const fromBackend = resolve(__dirname, '..', process.env.DATABASE_PATH)
+  databasePath = existsSync(fromCwd) ? fromCwd : (existsSync(fromBackend) ? fromBackend : (existsSync(bundledDbPath) ? bundledDbPath : fromCwd))
+} else {
+  databasePath = existsSync(bundledDbPath) ? bundledDbPath : resolve('./data/security-club.sqlite')
+}
 
 if (!useTurso) {
   // On Vercel / serverless platforms, deployment files are read-only.
@@ -582,6 +587,69 @@ if (currentSchemaVersion < 9) {
   }
 }
 
+if (currentSchemaVersion < 10) {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS awareness_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        year TEXT NOT NULL,
+        date TEXT NOT NULL,
+        image_url TEXT NOT NULL,
+        alt TEXT,
+        description TEXT,
+        published INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `)
+
+    const __dbDirname = dirname(fileURLToPath(import.meta.url))
+    const loadJson = (filename) => JSON.parse(readFileSync(resolve(__dbDirname, filename), 'utf8'))
+    const timestamp = new Date().toISOString()
+
+    if (existsSync(resolve(__dbDirname, 'static_awareness.json'))) {
+      const staticAwareness = loadJson('static_awareness.json')
+      const insertAwareness = db.prepare(`INSERT INTO awareness_items(title,category,year,date,image_url,alt,description,published,created_at,updated_at)
+        VALUES(?,?,?,?,?,?,?,1,?,?)`)
+      staticAwareness.forEach((item) => {
+        insertAwareness.run(
+          item.title,
+          item.category,
+          item.year || '2026-27',
+          item.date || 'July 2026',
+          item.image ? '/' + item.image.replace(/^\//, '') : '',
+          item.alt || '',
+          item.description || '',
+          timestamp,
+          timestamp
+        )
+      })
+    }
+
+    const sampleTestimonials = [
+      ['Riya Shah', 'Second Year Member', 'I joined with zero experience and now I confidently solve CTF web challenges.', 1, 1],
+      ['Kabir Joshi', 'Workshop Attendee', 'The sessions are practical, current, and genuinely career-shaping.', 1, 2],
+    ]
+    const insertTestimonial = db.prepare('INSERT OR IGNORE INTO testimonials(name,role_label,quote,published,display_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')
+    sampleTestimonials.forEach(([name, role, quote, published, order]) => {
+      const exists = db.prepare('SELECT 1 FROM testimonials WHERE name=?').get(name)
+      if (!exists) {
+        insertTestimonial.run(name, role, quote, published, order, timestamp, timestamp)
+      }
+    })
+
+    db.prepare('INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, ?)')
+      .run(10, 'awareness campaigns table and static import', timestamp)
+    db.exec('COMMIT')
+  } catch (error) {
+    try { db.exec('ROLLBACK') } catch { /* preserve original migration error */ }
+    throw error
+  }
+}
+
 export const now = () => new Date().toISOString()
 export const transaction = (callback) => {
   db.exec('BEGIN IMMEDIATE')
@@ -736,8 +804,10 @@ function seed() {
     (title,slug,category,difficulty,points,description,flag_hash,status,created_at,updated_at)
     VALUES(?,?,?,?,?,?,?,?,?,?)`)
   challenge.run('Welcome Challenge', 'welcome-challenge', 'web', 'beginner', 100, 'Find the flag hidden in the club welcome challenge.', sha256('flag{welcome_to_security_club}'), 'published', timestamp, timestamp)
-  const testimonial = db.prepare('INSERT OR IGNORE INTO testimonials(name,role_label,quote,published,display_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')
-  testimonial.run('Security Club Alumni', 'Alumni', 'The club turns curiosity into practical security skills.', 1, 1, timestamp, timestamp)
+  const testimonial = db.prepare('INSERT INTO testimonials(name,role_label,quote,published,display_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')
+  if (!db.prepare('SELECT 1 FROM testimonials WHERE name=?').get('Security Club Alumni')) {
+    testimonial.run('Security Club Alumni', 'Alumni', 'The club turns curiosity into practical security skills.', 1, 1, timestamp, timestamp)
+  }
   const adminEmail = (process.env.ADMIN_EMAIL ?? 'ayushtodkar404@gmail.com').trim().toLowerCase()
   const adminPassword = process.env.ADMIN_PASSWORD ?? 'Ayush@2005'
   const adminName = process.env.ADMIN_NAME ?? 'Ayush Todkar'
