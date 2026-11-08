@@ -1,6 +1,9 @@
 import express from 'express'
 import nodemailer from 'nodemailer'
 import { randomBytes } from 'node:crypto'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   db, hashPassword, verifyPassword, hashToken, sha256, slugify, now, transaction,
 } from './db.js'
@@ -8,6 +11,15 @@ import { roles } from './access.js'
 
 const app = express()
 const port = Number(process.env.PORT ?? 3001)
+
+const __serverDir = dirname(fileURLToPath(import.meta.url))
+const uploadsDir = resolve(__serverDir, '../../data/uploads')
+if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true })
+const frontendUploadsDir = resolve(__serverDir, '../../security_website/public/uploads')
+if (!existsSync(frontendUploadsDir)) {
+  try { mkdirSync(frontendUploadsDir, { recursive: true }) } catch { /* ignore */ }
+}
+app.use('/uploads', express.static(uploadsDir, { maxAge: '7d' }))
 const production = process.env.NODE_ENV === 'production'
 const allowedOrigins = new Set(
   (process.env.CORS_ORIGINS ??
@@ -63,7 +75,8 @@ const authLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 15, messa
 const contactLimiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 10, message: 'Too many messages sent. Please try again later.' })
 const flagLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 20, message: 'Too many flag submissions. Please slow down.' })
 
-app.use(express.json({ limit: '2mb' }))
+app.use(express.json({ limit: '15mb' }))
+app.use(express.urlencoded({ limit: '15mb', extended: true }))
 app.use((request, response, next) => {
   const origin = request.header('origin')
   let sameOrigin = false
@@ -472,6 +485,93 @@ app.delete('/api/events/:id/registrations', requireAuth, requireMember, (request
 })
 
 app.get('/api/awareness', (_request, response, next) => { try { send(response, db.prepare("SELECT id,title,category,year,date,image_url,alt,description FROM awareness_items WHERE published=1 ORDER BY id").all().map((item) => ({ ...item, image: item.image_url }))) } catch (error) { next(error) } })
+
+app.post('/api/awareness', requireAuth, (request, response, next) => {
+  try {
+    if (roleOf(request) !== 'admin') throw fail(403, 'Permission denied')
+    const title = value(request.body, 'title', { max: 200 })
+    const category = value(request.body, 'category', { max: 100 })
+    const year = value(request.body, 'year', { required: false, max: 40 }) ?? '2026-27'
+    const date = value(request.body, 'date', { required: false, max: 80 }) ?? new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    const imageUrl = value(request.body, 'imageUrl', { required: false, max: 1_800_000 }) ?? value(request.body, 'image_url', { required: false, max: 1_800_000 }) ?? value(request.body, 'image', { required: false, max: 1_800_000 }) ?? ''
+    const alt = value(request.body, 'alt', { required: false, max: 300 }) ?? title
+    const description = value(request.body, 'description', { required: false, max: 5000 }) ?? ''
+    const timestamp = now()
+    const result = db.prepare(`INSERT INTO awareness_items(title,category,year,date,image_url,alt,description,published,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,1,?,?)`).run(title, category, year, date, imageUrl, alt, description, timestamp, timestamp)
+    const id = Number(result.lastInsertRowid)
+    audit(request, 'create', 'awareness_item', id, null, { id, title })
+    send(response, { id, title, category, year, date, image: imageUrl, image_url: imageUrl, alt, description }, 201)
+  } catch (error) { next(error) }
+})
+
+app.delete('/api/awareness/:id', requireAuth, (request, response, next) => {
+  try {
+    if (roleOf(request) !== 'admin') throw fail(403, 'Permission denied')
+    const id = integer({ id: request.params.id }, 'id', { min: 1 })
+    const before = db.prepare('SELECT * FROM awareness_items WHERE id=?').get(id)
+    if (!before) throw fail(404, 'Awareness item not found')
+    db.prepare('UPDATE awareness_items SET published=0,updated_at=? WHERE id=?').run(now(), id)
+    audit(request, 'archive', 'awareness_item', id, before, db.prepare('SELECT * FROM awareness_items WHERE id=?').get(id))
+    send(response, { ok: true })
+  } catch (error) { next(error) }
+})
+
+app.post('/api/upload', requireAuth, (request, response, next) => {
+  try {
+    if (roleOf(request) !== 'admin') throw fail(403, 'Administrator access required')
+    const data = request.body?.data
+    if (!data || typeof data !== 'string') throw fail(400, 'Image data is required')
+
+    const matches = data.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-+.]+);base64,(.+)$/)
+    const rawMime = (matches ? matches[1] : (request.body?.mimeType || '')).toLowerCase()
+    const base64Data = matches ? matches[2] : data
+
+    const allowedMimes = {
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'image/gif': '.gif',
+      'image/svg+xml': '.svg',
+    }
+
+    if (!allowedMimes[rawMime]) {
+      throw fail(400, 'Invalid file type. Only JPEG, PNG, WEBP, GIF, and SVG images are allowed.')
+    }
+
+    const buffer = Buffer.from(base64Data, 'base64')
+    if (buffer.length > 10 * 1024 * 1024) {
+      throw fail(400, 'Image file exceeds maximum 10MB limit')
+    }
+
+    if (rawMime === 'image/png' && (buffer.length < 8 || !buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))) {
+      throw fail(400, 'Corrupted or spoofed PNG file')
+    }
+    if ((rawMime === 'image/jpeg' || rawMime === 'image/jpg') && (buffer.length < 2 || buffer[0] !== 0xff || buffer[1] !== 0xd8)) {
+      throw fail(400, 'Corrupted or spoofed JPEG file')
+    }
+    if (rawMime === 'image/gif' && (buffer.length < 3 || !buffer.subarray(0, 3).equals(Buffer.from('GIF')))) {
+      throw fail(400, 'Corrupted or spoofed GIF file')
+    }
+
+    const ext = allowedMimes[rawMime]
+    const safeName = `img_${randomBytes(12).toString('hex')}_${Date.now()}${ext}`
+
+    writeFileSync(resolve(uploadsDir, safeName), buffer)
+    try {
+      if (existsSync(frontendUploadsDir)) {
+        writeFileSync(resolve(frontendUploadsDir, safeName), buffer)
+      }
+    } catch {
+      // non-fatal
+    }
+
+    const fileUrl = `/uploads/${safeName}`
+    audit(request, 'upload', 'media', null, null, { fileUrl, size: buffer.length })
+    send(response, { url: fileUrl, filename: safeName, size: buffer.length }, 201)
+  } catch (error) { next(error) }
+})
 app.get('/api/flagships', (_request, response, next) => { try { send(response, db.prepare("SELECT * FROM flagships WHERE status='published' ORDER BY year DESC,id").all()) } catch (error) { next(error) } })
 app.get('/api/gallery', (_request, response, next) => { try { send(response, db.prepare(`SELECT g.id,g.folder_id,g.image_url,g.caption,g.taken_at,e.title AS event FROM gallery_items g LEFT JOIN events e ON e.id=g.event_id WHERE g.published=1 ORDER BY g.taken_at DESC,g.id DESC`).all()) } catch (error) { next(error) } })
 app.get('/api/gallery/workspace', (_request, response, next) => {

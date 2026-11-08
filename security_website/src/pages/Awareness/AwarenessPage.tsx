@@ -1,12 +1,26 @@
-import { useEffect, useState } from 'react'
-import { getAwareness } from '../../api/client'
+import { useEffect, useState, type FormEvent } from 'react'
+import { getAwareness, createAwarenessItem, deleteAwarenessItem } from '../../api/client'
 import { awareness as defaultAwareness, type AwarenessItem } from '../../data/awareness'
+import { useAdmin } from '../../hooks/useAdmin'
+import DeviceImageUploader from '../../components/common/DeviceImageUploader'
 
 export default function AwarenessPage() {
+  const isAdmin = useAdmin()
   const [items, setItems] = useState<AwarenessItem[]>(defaultAwareness)
   const [selectedYear, setSelectedYear] = useState('2026-27')
   const [selectedCat, setSelectedCat] = useState('all')
   const [activeLightboxItem, setActiveLightboxItem] = useState<AwarenessItem | null>(null)
+
+  // Admin state
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [adminError, setAdminError] = useState<string | null>(null)
+  const [formTitle, setFormTitle] = useState('')
+  const [formCategory, setFormCategory] = useState('Cyber Advisory')
+  const [formYear, setFormYear] = useState('2026-27')
+  const [formDate, setFormDate] = useState('July 2026')
+  const [formImage, setFormImage] = useState('')
+  const [formDescription, setFormDescription] = useState('')
 
   useEffect(() => {
     let active = true
@@ -16,7 +30,7 @@ export default function AwarenessPage() {
         if (data && data.length > 0) {
           const merged = data.map((apiItem) => {
             const fallback = defaultAwareness.find(
-              (a) => a.title.toLowerCase() === apiItem.title.toLowerCase()
+              (a) => a.title.toLowerCase() === apiItem.title.toLowerCase() || a.id === apiItem.id
             )
             return {
               ...fallback,
@@ -34,6 +48,63 @@ export default function AwarenessPage() {
       active = false
     }
   }, [])
+
+  const handleAddCampaign = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!formTitle.trim() || !formImage.trim()) return
+    setSubmitting(true)
+    setAdminError(null)
+
+    try {
+      const created = await createAwarenessItem({
+        title: formTitle.trim(),
+        category: formCategory.trim(),
+        year: formYear.trim(),
+        date: formDate.trim(),
+        imageUrl: formImage.trim(),
+        alt: formTitle.trim(),
+        description: formDescription.trim(),
+      })
+
+      const newItem: AwarenessItem = {
+        id: created.id || Date.now(),
+        title: created.title || formTitle.trim(),
+        category: formCategory.trim(),
+        year: formYear.trim(),
+        date: formDate.trim(),
+        image: formImage.trim(),
+        alt: formTitle.trim(),
+        description: formDescription.trim(),
+      }
+
+      setItems((prev) => [newItem, ...prev])
+      setShowAddModal(false)
+      setFormTitle('')
+      setFormImage('')
+      setFormDescription('')
+    } catch (err) {
+      setAdminError(err instanceof Error ? err.message : 'Failed to publish awareness campaign')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteCampaign = async (item: AwarenessItem) => {
+    if (!window.confirm(`Delete awareness campaign "${item.title}"?`)) return
+    try {
+      if (item.id) {
+        await deleteAwarenessItem(item.id)
+      }
+      setItems((prev) =>
+        prev.filter((a) => (a.id && item.id ? a.id !== item.id : a.title !== item.title))
+      )
+      if (activeLightboxItem?.title === item.title) {
+        setActiveLightboxItem(null)
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete campaign')
+    }
+  }
 
   const years = Array.from(new Set(items.map((a) => a.year || '2026-27')))
 
@@ -56,6 +127,134 @@ export default function AwarenessPage() {
           </p>
         </div>
       </section>
+
+      {isAdmin && (
+        <div className="admin-action-bar">
+          <div className="admin-badge-group">
+            <span className="admin-badge-tag">Admin Mode</span>
+            <p>You have permission to publish new awareness advisories or archive existing posters.</p>
+          </div>
+          <button
+            type="button"
+            className="admin-btn-add"
+            onClick={() => {
+              setAdminError(null)
+              setShowAddModal(true)
+            }}
+          >
+            + Add Awareness Campaign
+          </button>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className="admin-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="admin-modal-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h3>Publish Cyber Awareness Alert</h3>
+              <button
+                type="button"
+                className="admin-modal-close"
+                onClick={() => setShowAddModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            {adminError && <div className="admin-form-error">{adminError}</div>}
+
+            <form onSubmit={handleAddCampaign} className="admin-form-grid">
+              <div className="admin-field-group">
+                <label htmlFor="aware-title">Campaign Title *</label>
+                <input
+                  id="aware-title"
+                  type="text"
+                  required
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="e.g. Defend Against QR Code Phishing (Quishing)"
+                />
+              </div>
+
+              <div className="admin-form-row">
+                <div className="admin-field-group">
+                  <label htmlFor="aware-cat">Category *</label>
+                  <select
+                    id="aware-cat"
+                    value={formCategory}
+                    onChange={(e) => setFormCategory(e.target.value)}
+                  >
+                    <option value="Cyber Advisory">Cyber Advisory</option>
+                    <option value="Campaign Poster">Campaign Poster</option>
+                    <option value="Security Guide">Security Guide</option>
+                    <option value="Threat Notice">Threat Notice</option>
+                  </select>
+                </div>
+                <div className="admin-field-group">
+                  <label htmlFor="aware-year">Year *</label>
+                  <input
+                    id="aware-year"
+                    type="text"
+                    required
+                    value={formYear}
+                    onChange={(e) => setFormYear(e.target.value)}
+                    placeholder="2026-27"
+                  />
+                </div>
+              </div>
+
+              <div className="admin-field-group">
+                <label htmlFor="aware-date">Date Label</label>
+                <input
+                  id="aware-date"
+                  type="text"
+                  value={formDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                  placeholder="e.g. July 2026"
+                />
+              </div>
+
+              {/* Direct image upload from device */}
+              <DeviceImageUploader
+                value={formImage}
+                onChange={setFormImage}
+                label="Campaign Poster / Infographic from Device *"
+                required
+                helpText="Select or drag campaign graphic from your device (PNG, JPG, WebP, SVG)"
+              />
+
+              <div className="admin-field-group">
+                <label htmlFor="aware-desc">Description &amp; Actionable Tips</label>
+                <textarea
+                  id="aware-desc"
+                  rows={3}
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Outline preventive measures, red flags to inspect, and response guidelines..."
+                />
+              </div>
+
+              <div className="admin-form-footer">
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => setShowAddModal(false)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  disabled={submitting || !formImage}
+                >
+                  {submitting ? 'Publishing...' : 'Publish Campaign'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="awareness-browser">
         <div className="team-controls-bar awareness-controls-bar">
@@ -100,9 +299,11 @@ export default function AwarenessPage() {
         ) : (
           <div className="card-grid awareness-grid">
             {filteredItems.map((item) => (
-              <article className="card awareness-card" key={item.title}>
+              <article className="card awareness-card" key={item.id ? `${item.id}-${item.title}` : item.title}>
                 <div className="awareness-card-header">
-                  <span className="awareness-cat-pill">{item.category}</span>
+                  <span className="awareness-cat-pill">
+                    {item.category.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </span>
                   <span className="awareness-year-pill">{item.year}</span>
                 </div>
 
@@ -154,6 +355,19 @@ export default function AwarenessPage() {
                       Full Res ↗
                     </a>
                   </div>
+
+                  {isAdmin && (
+                    <div className="admin-card-actions">
+                      <button
+                        type="button"
+                        className="admin-delete-btn"
+                        onClick={() => handleDeleteCampaign(item)}
+                        title={`Delete ${item.title}`}
+                      >
+                        ✕ Delete Campaign
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
             ))}
@@ -188,14 +402,25 @@ export default function AwarenessPage() {
               <div className="awareness-lightbox-info">
                 <h3 className="awareness-lightbox-title">{activeLightboxItem.title}</h3>
                 <p className="awareness-lightbox-caption">{activeLightboxItem.description}</p>
-                <a
-                  className="button button-primary button-sm awareness-lightbox-link"
-                  href={activeLightboxItem.image}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open Original ↗
-                </a>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <a
+                    className="button button-primary button-sm awareness-lightbox-link"
+                    href={activeLightboxItem.image}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open Original ↗
+                  </a>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      className="admin-delete-btn"
+                      onClick={() => handleDeleteCampaign(activeLightboxItem)}
+                    >
+                      ✕ Delete Campaign
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -204,4 +429,3 @@ export default function AwarenessPage() {
     </div>
   )
 }
-

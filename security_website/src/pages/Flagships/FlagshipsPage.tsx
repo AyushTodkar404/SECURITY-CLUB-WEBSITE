@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { getFlagships, createFlagship, deleteFlagship } from '../../api/client'
 import { flagships as defaultFlagships, type Flagship } from '../../data/flagships'
 import { useAdmin } from '../../hooks/useAdmin'
+import DeviceImageUploader from '../../components/common/DeviceImageUploader'
 
 export default function FlagshipsPage() {
   const isAdmin = useAdmin()
@@ -187,16 +188,11 @@ export default function FlagshipsPage() {
                 </div>
               </div>
 
-              <div className="admin-field-group">
-                <label htmlFor="flagship-image">Emblem / Image URL</label>
-                <input
-                  id="flagship-image"
-                  type="text"
-                  value={formImage}
-                  onChange={(e) => setFormImage(e.target.value)}
-                  placeholder="/assets/flagships/... or https://..."
-                />
-              </div>
+              <DeviceImageUploader
+                value={formImage}
+                onChange={setFormImage}
+                label="Flagship Emblem / Image from Device"
+              />
 
               <div className="admin-field-group">
                 <label htmlFor="flagship-desc">Description *</label>
@@ -245,7 +241,7 @@ export default function FlagshipsPage() {
 
         <div className="card-grid flagship-grid">
           {items.map((item, index) => {
-            const numTag = `FLAGSHIP 0${index + 1}`
+            const numTag = `Initiative 0${index + 1}`
             const isSiege = item.badge === 'siege' || /siege/i.test(item.title)
             const emblemSvg = isSiege ? (
               <svg viewBox="0 0 48 48" width="38" height="38" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -271,7 +267,17 @@ export default function FlagshipsPage() {
                       {item.status || item.cycle || '2026-27 Edition'}
                     </span>
                   </div>
-                  <div className="flagship-emblem">{emblemSvg}</div>
+                  <div className="flagship-emblem">
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)' }}
+                      />
+                    ) : (
+                      emblemSvg
+                    )}
+                  </div>
                 </div>
 
                 <div className="card-body flagship-card-body">
@@ -284,7 +290,7 @@ export default function FlagshipsPage() {
                     <div className="flagship-pillars">
                       {item.pillars.map((pillar) => (
                         <span className="flagship-pillar-tag" key={pillar}>
-                          <span className="pillar-bullet" aria-hidden="true">◈</span>
+                          <span className="pillar-bullet" aria-hidden="true">&bull;</span>
                           {pillar}
                         </span>
                       ))}

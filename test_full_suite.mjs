@@ -219,6 +219,20 @@ async function runLiveTests() {
     });
     assert(visitorAddGallery.status === 401, 'Visitor cannot add gallery image (401 Unauthorized)');
 
+    const visitorAddAwareness = await fetch(`${baseUrl}/awareness`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Rogue Campaign', imageUrl: '/comic.webp' }),
+    });
+    assert(visitorAddAwareness.status === 401, 'Visitor cannot add awareness campaign (401 Unauthorized)');
+
+    const visitorUploadImage = await fetch(`${baseUrl}/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', filename: 'hack.png' }),
+    });
+    assert(visitorUploadImage.status === 401, 'Visitor cannot upload device image (401 Unauthorized)');
+
     // 5.2 Login as Administrator
     const loginRes = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
@@ -297,6 +311,20 @@ async function runLiveTests() {
       body: JSON.stringify({ imageUrl: '/test.jpg' }),
     });
     assert(memberAddGallery.status === 403, 'Member cannot add gallery image (403 Forbidden)');
+
+    const memberAddAwareness = await fetch(`${baseUrl}/awareness`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: memberCookie },
+      body: JSON.stringify({ title: 'Member Campaign', imageUrl: '/comic.webp' }),
+    });
+    assert(memberAddAwareness.status === 403, 'Member cannot add awareness campaign (403 Forbidden)');
+
+    const memberUploadImage = await fetch(`${baseUrl}/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: memberCookie },
+      body: JSON.stringify({ data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', filename: 'hack.png' }),
+    });
+    assert(memberUploadImage.status === 403, 'Member cannot upload device image (403 Forbidden)');
 
     // 5.5 Test Admin CAN Add & Delete in all 5 sections
     const runId = Date.now();
@@ -405,6 +433,58 @@ async function runLiveTests() {
       headers: { Cookie: adminCookie },
     });
     assert(adminDeleteGallery.status === 200, 'Administrator can delete gallery photo (200 OK)');
+
+    // --- SECTION F: SECURITY AWARENESS ---
+    const adminAddAwareness = await fetch(`${baseUrl}/awareness`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
+      body: JSON.stringify({
+        title: `Phishing Detection Guide ${runId}`,
+        category: 'CAMPUS GUIDE',
+        year: '2026-27',
+        date: 'November 2026',
+        imageUrl: `/awareness/2026-27/test_comic_${runId}.webp`,
+        alt: 'Phishing Awareness Comic',
+        description: 'Guide on recognizing fraudulent multi-factor prompt fatigue attacks.',
+      }),
+    });
+    assert(adminAddAwareness.status === 201, 'Administrator can add security awareness campaign (201 Created)');
+    const createdAwareness = await adminAddAwareness.json();
+
+    const adminDeleteAwareness = await fetch(`${baseUrl}/awareness/${createdAwareness.id}`, {
+      method: 'DELETE',
+      headers: { Cookie: adminCookie },
+    });
+    assert(adminDeleteAwareness.status === 200, 'Administrator can delete security awareness campaign (200 OK)');
+
+    // --- SECTION G: DEVICE IMAGE UPLOAD (OWASP VALIDATION) ---
+    // 1x1 valid transparent PNG base64
+    const validPngBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const uploadRes = await fetch(`${baseUrl}/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
+      body: JSON.stringify({
+        data: validPngBase64,
+        filename: 'device_photo.png',
+        mimeType: 'image/png',
+      }),
+    });
+    assert(uploadRes.status === 201, 'Administrator can upload image from device (201 Created)');
+    const uploadData = await uploadRes.json();
+    assert(uploadData.url && uploadData.url.startsWith('/uploads/'), 'Upload returns safe, server-relative URL path');
+    assert(fs.existsSync(path.join('data', uploadData.url)), 'Uploaded device image physically persisted in data/uploads/');
+
+    // Spoofed file rejection (text file masquerading as image)
+    const spoofedRes = await fetch(`${baseUrl}/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: adminCookie },
+      body: JSON.stringify({
+        data: 'data:image/png;base64,VGhpcyBpcyBhIHBsYWluIHRleHQgZmlsZSBub3QgYSBQTkc=',
+        filename: 'malicious.php.png',
+        mimeType: 'image/png',
+      }),
+    });
+    assert(spoofedRes.status === 400, 'Upload rejects spoofed file lacking PNG magic bytes (400 Bad Request)');
 
   } finally {
     try {

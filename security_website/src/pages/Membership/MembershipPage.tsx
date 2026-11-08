@@ -32,7 +32,7 @@ export default function MembershipPage() {
       })
 
       setMessage(
-        `Application #${result.id} submitted successfully! The core team will review your details.`
+        `Application #${result.id} submitted successfully. The core team will review your details.`
       )
       formElement.reset()
     } catch (err) {

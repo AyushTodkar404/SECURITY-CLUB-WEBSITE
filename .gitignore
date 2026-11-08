@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+.DS_Store
+Thumbs.db
+
+# Dynamic uploads (preserve directories via .gitkeep)
+data/uploads/*
+!data/uploads/.gitkeep
+security_website/public/uploads/*
+!security_website/public/uploads/.gitkeep

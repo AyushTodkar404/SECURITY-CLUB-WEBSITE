@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { getEvents, createEvent, deleteEvent } from '../../api/client'
 import { events as defaultEvents, type EventItem } from '../../data/events'
 import { useAdmin } from '../../hooks/useAdmin'
+import DeviceImageUploader from '../../components/common/DeviceImageUploader'
 
 function eventYear(dateStr?: string) {
   const value = String(dateStr || '').trim()
@@ -245,16 +246,12 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              <div className="admin-field-group">
-                <label htmlFor="event-poster">Poster / Image URL</label>
-                <input
-                  id="event-poster"
-                  type="text"
-                  value={formPoster}
-                  onChange={(e) => setFormPoster(e.target.value)}
-                  placeholder="/events/posters/... or https://..."
-                />
-              </div>
+              <DeviceImageUploader
+                value={formPoster}
+                onChange={setFormPoster}
+                label="Event Poster / Banner from Device"
+                helpText="Upload workshop flyer or banner from device (PNG, JPG, WebP, SVG)"
+              />
 
               <div className="admin-field-group">
                 <label htmlFor="event-summary">Summary</label>
@@ -346,10 +343,10 @@ export default function EventsPage() {
 
                   <div className="card-body">
                     <p className="card-meta">
-                      {event.type.toUpperCase()} &middot; {event.dateLabel || event.date.slice(0, 10)}
+                      {event.type.charAt(0).toUpperCase() + event.type.slice(1)} &middot; {event.dateLabel || event.date.slice(0, 10)}
                     </p>
                     <h3>{event.title}</h3>
-                    {event.venue && <p className="role">&Omicron; {event.venue}</p>}
+                    {event.venue && <p className="role">{event.venue}</p>}
                     <p>{event.description}</p>
                     <p className="card-action-hint">View event details &rarr;</p>
 

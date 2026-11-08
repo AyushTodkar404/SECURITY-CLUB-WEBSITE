@@ -178,6 +178,7 @@ export interface Challenge {
 }
 
 export interface AwarenessItem {
+  id?: number
   title: string
   category: string
   year: string

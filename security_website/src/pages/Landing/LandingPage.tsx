@@ -30,11 +30,8 @@ export default function LandingPage() {
     <div className="page section-shell">
       <section className="page-hero">
         <div>
-          <p className="eyebrow">Security Club · Welcome terminal</p>
+          <p className="eyebrow">Don Bosco Institute of Technology</p>
           <h1>Curious about cybersecurity? You belong here.</h1>
-          <p className="terminal-line" style={{ margin: '0.65rem 0', fontFamily: 'var(--font-mono)', fontSize: '0.88rem', color: 'var(--muted)' }}>
-            $ whoami <span style={{ color: 'var(--accent)' }}>→ future security builder</span>
-          </p>
           <p className="hero-lede">
             Security Club is a welcoming campus community for beginners, builders and problem-solvers.
             Explore cybersecurity through workshops, CTFs, projects and hands-on learning.
@@ -66,16 +63,16 @@ export default function LandingPage() {
 
       <section className="opportunities">
         <div className="stat">
-          <strong>Hands-on Labs</strong>
-          <span>Workshops &amp; practical defense</span>
+          <strong>20+</strong>
+          <span>Core mentors and student leads</span>
         </div>
         <div className="stat">
-          <strong>CTF Challenges</strong>
-          <span>Interactive beginner-friendly labs</span>
+          <strong>30+</strong>
+          <span>Hands-on labs and photo archives</span>
         </div>
         <div className="stat">
-          <strong>Open Community</strong>
-          <span>Zero prerequisites to start</span>
+          <strong>100%</strong>
+          <span>Open to all DBIT departments</span>
         </div>
       </section>
 

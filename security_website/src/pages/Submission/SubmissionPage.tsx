@@ -148,7 +148,7 @@ Sent via Security Club DBIT Website Submission Form`
 
           {submitted && draftUrl && (
             <div className="form-feedback is-success" role="status" style={{ marginBottom: '1rem' }}>
-              <strong>Draft ready!</strong> Opening Gmail… If blocked by popup settings,{' '}
+              <strong>Draft ready.</strong> Opening Gmail… If blocked by popup settings,{' '}
               <a href={draftUrl} target="_blank" rel="noopener noreferrer">
                 click here to open manually ↗
               </a>

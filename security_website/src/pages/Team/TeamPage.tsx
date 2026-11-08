@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { getTeam, createTeamMember, deleteTeamMember } from '../../api/client'
 import { team as defaultTeam, type TeamMember } from '../../data/team'
 import { useAdmin } from '../../hooks/useAdmin'
+import DeviceImageUploader from '../../components/common/DeviceImageUploader'
 
 function departmentOf(role: string): string {
   const r = String(role || '').toLowerCase()
@@ -145,13 +146,13 @@ export default function TeamPage() {
 
   const renderCard = (item: TeamMember) => {
     const deptCode = item.department
-      ? item.department.toUpperCase()
+      ? item.department.charAt(0).toUpperCase() + item.department.slice(1).toLowerCase()
       : item.role && /faculty|coordinator|mentor/i.test(item.role)
-        ? 'FACULTY'
+        ? 'Faculty'
         : item.role && /alumni/i.test(item.role)
-          ? 'ALUMNI'
-          : 'MEMBER'
-    const tenureTag = item.tenure || (item.role && /alumni/i.test(item.role) ? 'ALUMNI' : 'MENTOR')
+          ? 'Alumni'
+          : 'Member'
+    const tenureTag = item.tenure || (item.role && /alumni/i.test(item.role) ? 'Alumni' : 'Mentor')
     const isLeader = /president/i.test(item.role || '')
 
     return (
@@ -342,27 +343,21 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              <div className="admin-form-row">
-                <div className="admin-field-group">
-                  <label htmlFor="team-image">Image URL</label>
-                  <input
-                    id="team-image"
-                    type="text"
-                    value={formImage}
-                    onChange={(e) => setFormImage(e.target.value)}
-                    placeholder="/team/member.webp or https://..."
-                  />
-                </div>
-                <div className="admin-field-group">
-                  <label htmlFor="team-linkedin">LinkedIn URL</label>
-                  <input
-                    id="team-linkedin"
-                    type="url"
-                    value={formLinkedin}
-                    onChange={(e) => setFormLinkedin(e.target.value)}
-                    placeholder="https://linkedin.com/in/..."
-                  />
-                </div>
+              <DeviceImageUploader
+                value={formImage}
+                onChange={setFormImage}
+                label="Profile Photo from Device"
+              />
+
+              <div className="admin-field-group">
+                <label htmlFor="team-linkedin">LinkedIn URL</label>
+                <input
+                  id="team-linkedin"
+                  type="url"
+                  value={formLinkedin}
+                  onChange={(e) => setFormLinkedin(e.target.value)}
+                  placeholder="https://linkedin.com/in/..."
+                />
               </div>
 
               <div className="admin-field-group">

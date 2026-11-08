@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { getGallery, createGalleryPhoto, deleteGalleryPhoto } from '../../api/client'
 import { gallery as defaultGallery, type GalleryItem } from '../../data/gallery'
 import { useAdmin } from '../../hooks/useAdmin'
+import DeviceImageUploader from '../../components/common/DeviceImageUploader'
 
 export default function GalleryPage() {
   const isAdmin = useAdmin()
@@ -150,17 +151,12 @@ export default function GalleryPage() {
             {adminError && <div className="admin-form-error">{adminError}</div>}
 
             <form onSubmit={handleAddPhoto} className="admin-form-grid">
-              <div className="admin-field-group">
-                <label htmlFor="gallery-img">Image URL or Asset Path *</label>
-                <input
-                  id="gallery-img"
-                  type="text"
-                  required
-                  value={formImage}
-                  onChange={(e) => setFormImage(e.target.value)}
-                  placeholder="/gallery/.../photo.jpg or https://..."
-                />
-              </div>
+              <DeviceImageUploader
+                value={formImage}
+                onChange={setFormImage}
+                label="Gallery Photo from Device *"
+                required
+              />
 
               <div className="admin-field-group">
                 <label htmlFor="gallery-caption">Caption &amp; Alt Description *</label>
@@ -255,34 +251,31 @@ export default function GalleryPage() {
               <button
                 className="gallery-image-button"
                 type="button"
-                aria-label={`Open ${item.alt || item.caption}`}
+                aria-label="View photo in lightbox"
                 onClick={() => setActivePhoto(item)}
               >
                 <img
                   src={item.image}
-                  alt={item.alt || item.caption}
+                  alt={item.alt || 'Security Club gallery photo'}
                   className="is-loaded"
                   loading="lazy"
                 />
               </button>
-              <figcaption>
-                {item.caption}
-                {isAdmin && (
-                  <div className="admin-card-actions" style={{ marginTop: '0.4rem' }}>
-                    <button
-                      type="button"
-                      className="admin-delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeletePhoto(item)
-                      }}
-                      title="Delete image"
-                    >
-                      ✕ Delete
-                    </button>
-                  </div>
-                )}
-              </figcaption>
+              {isAdmin && (
+                <div className="gallery-admin-overlay">
+                  <button
+                    type="button"
+                    className="admin-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeletePhoto(item)
+                    }}
+                    title="Delete image"
+                  >
+                    ✕ Delete
+                  </button>
+                </div>
+              )}
             </figure>
           ))}
         </div>

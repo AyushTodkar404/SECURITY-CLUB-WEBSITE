@@ -349,22 +349,22 @@ export default function CTFPage() {
       <div className="ctf-browser">
         <div className="ctf-terminal-hud">
           <div className="ctf-hud-stat">
-            <span className="hud-label">ENVIRONMENT</span>
+            <span className="hud-label">Environment</span>
             <span className="hud-val hud-online">
               <span className="status-beacon" aria-hidden="true" />
               Active Labs
             </span>
           </div>
           <div className="ctf-hud-stat">
-            <span className="hud-label">CHALLENGES</span>
-            <span className="hud-val">{items.length} Available</span>
+            <span className="hud-label">Challenges</span>
+            <span className="hud-val">{items.length} available</span>
           </div>
           <div className="ctf-hud-stat">
-            <span className="hud-label">SESSION SCORE</span>
-            <span className="hud-val hud-score">{totalScore} PTS</span>
+            <span className="hud-label">Session score</span>
+            <span className="hud-val hud-score">{totalScore} pts</span>
           </div>
           <div className="ctf-hud-stat">
-            <span className="hud-label">FLAGS SOLVED</span>
+            <span className="hud-label">Flags solved</span>
             <span className="hud-val">
               {solvedIds.length} / {items.length}
             </span>
@@ -381,7 +381,7 @@ export default function CTFPage() {
                 aria-pressed={selectedCat === cat}
                 onClick={() => setSelectedCat(cat)}
               >
-                {cat === 'all' ? 'All Challenges' : cat.toUpperCase()}
+                {cat === 'all' ? 'All challenges' : cat.charAt(0).toUpperCase() + cat.slice(1)}
               </button>
             ))}
           </div>
@@ -402,13 +402,13 @@ export default function CTFPage() {
                 <div className="ctf-card-header">
                   <div className="ctf-category-group">
                     <span className={`ctf-cat-pill ctf-cat-${c.category.toLowerCase()}`}>
-                      {c.category.toUpperCase()}
+                      {c.category.charAt(0).toUpperCase() + c.category.slice(1)}
                     </span>
                     <span className={`ctf-diff-pill ctf-diff-${c.difficulty.toLowerCase()}`}>
-                      {c.difficulty.toUpperCase()}
+                      {c.difficulty.charAt(0).toUpperCase() + c.difficulty.slice(1)}
                     </span>
                   </div>
-                  <span className="ctf-pts-badge">{c.points} PTS</span>
+                  <span className="ctf-pts-badge">{c.points} pts</span>
                 </div>
 
                 <div className="card-body ctf-card-body">

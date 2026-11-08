@@ -490,3 +490,46 @@ export async function deleteChallenge(id: number): Promise<void> {
 export const deleteEvent = cancelEvent
 export const deleteFlagship = archiveFlagship
 export const deleteTeamMember = archiveTeamMember
+
+export async function uploadImage(file: File): Promise<{ url: string; filename: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        const base64Url = reader.result as string
+        const result = await request<{ url: string; filename: string }>('/upload', {
+          method: 'POST',
+          ...jsonBody({
+            data: base64Url,
+            filename: file.name,
+            mimeType: file.type,
+          }),
+        })
+        resolve(result)
+      } catch (err) {
+        reject(err)
+      }
+    }
+    reader.onerror = () => reject(new Error('Failed to read image file from device'))
+    reader.readAsDataURL(file)
+  })
+}
+
+export async function createAwarenessItem(input: {
+  title: string
+  category: string
+  imageUrl: string
+  year?: string
+  date?: string
+  alt?: string
+  description?: string
+}): Promise<AwarenessItem> {
+  return request<AwarenessItem>('/awareness', {
+    method: 'POST',
+    ...jsonBody(input),
+  })
+}
+
+export async function deleteAwarenessItem(id: number): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/awareness/${id}`, { method: 'DELETE' })
+}
